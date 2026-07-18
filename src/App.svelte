@@ -25,6 +25,8 @@
   const windowPositionStorageKey = "toerings.window-position.v1"
 
   let preferencesVisible = false
+  let preferencesOnLeft = false
+  let resizeRequest = 0
 
   function loadWindowPosition(): PhysicalPosition | null {
     try {
@@ -52,23 +54,39 @@
   }
 
   async function resizeWindow(showPreferences: boolean) {
-    try {
-      await appWindow.setSize(new LogicalSize(showPreferences ? 650 : 325, 850))
-      if (!showPreferences || !preferencesVisible) return
+    const request = ++resizeRequest
 
-      const [monitor, position, size] = await Promise.all([
-        currentMonitor(),
+    try {
+      const [position, previousSize] = await Promise.all([
         appWindow.outerPosition(),
         appWindow.outerSize()
       ])
-      if (!monitor || !preferencesVisible) return
+
+      await appWindow.setSize(new LogicalSize(showPreferences ? 650 : 325, 850))
+      const size = await appWindow.outerSize()
+      if (request !== resizeRequest) return
+
+      if (!showPreferences) {
+        if (preferencesOnLeft) {
+          await appWindow.setPosition(
+            new PhysicalPosition(position.x + previousSize.width - size.width, position.y)
+          )
+        }
+        preferencesOnLeft = false
+        return
+      }
+
+      const monitor = await currentMonitor()
+      if (!monitor || !preferencesVisible || request !== resizeRequest) return
 
       const minX = monitor.position.x
-      const maxX = minX + monitor.size.width - size.width
-      const visibleX = Math.min(Math.max(position.x, minX), Math.max(minX, maxX))
+      const monitorRight = minX + monitor.size.width
+      preferencesOnLeft = position.x + size.width > monitorRight
 
-      if (visibleX !== position.x) {
-        await appWindow.setPosition(new PhysicalPosition(visibleX, position.y))
+      if (preferencesOnLeft) {
+        const widthDifference = size.width - previousSize.width
+        const expandedX = Math.max(minX, position.x - widthDifference)
+        await appWindow.setPosition(new PhysicalPosition(expandedX, position.y))
       }
     } catch {
       // Keep the current window geometry if monitor information is unavailable.
@@ -219,7 +237,7 @@
 
 <svelte:window on:keydown={onKeydown} />
 
-<div class="flex" use:styleVars={cssVars}>
+<div class:preferences-left={preferencesOnLeft} class="flex" use:styleVars={cssVars}>
   <main>
     <SummaryWidget {summaryData} />
     <CPUWidget {cpuData} {tempData} {processList} />
@@ -237,6 +255,10 @@
   .flex {
     background-color: var(--backgroundColor);
     display: flex;
+  }
+
+  .preferences-left {
+    flex-direction: row-reverse;
   }
 
   main {
