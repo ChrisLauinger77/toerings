@@ -25,7 +25,11 @@ jobs:
               repo: context.repo.repo,
               tag_name: tagName,
               name: `ToeRings ${tagName}`,
-              body: "Take a look at the assets to download and install this app.",
+              body: [
+                "Download the bundle for your platform from the assets below.",
+                "",
+                "macOS builds are ad-hoc signed but cannot be notarized without a paid Apple Developer Program membership. On first launch, Control-click ToeRings and choose Open. See the README for additional Gatekeeper instructions."
+              ].join("\n"),
               draft: true,
               prerelease: false
             })
@@ -74,11 +78,20 @@ jobs:
       - name: install frontend dependencies
         run: npm ci
       - uses: tauri-apps/tauri-action@v0
+        id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.tauri-args }}
+      - name: verify macOS app signature
+        if: startsWith(matrix.platform, 'macos')
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+        run: |
+          app_path=$(jq -r '.[] | select(endswith(".app"))' <<< "$ARTIFACT_PATHS" | head -n 1)
+          test -n "$app_path"
+          codesign --verify --deep --strict --verbose=4 "$app_path"
 
   publish-release:
     permissions:

@@ -31,6 +31,9 @@ migration. Do not mix migration work into maintenance or release changes.
 - Linux CI uses Rust 1.66.1 because the Tauri 1 dependency set does not compile reliably
   with newer Rust releases. macOS CI uses stable Rust for Apple Silicon and Universal
   builds.
+- macOS bundles use the ad-hoc signing identity `"-"`. Strict signature verification must
+  pass in CI, but the builds are not notarized and require the first-launch Gatekeeper
+  steps documented in the README.
 
 ## Git and GitHub workflow
 

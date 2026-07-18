@@ -53,6 +53,14 @@ jobs:
         id: tauri
         with:
           args: ${{ matrix.tauri-args }}
+      - name: verify macOS app signature
+        if: startsWith(matrix.platform, 'macos')
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+        run: |
+          app_path=$(jq -r '.[] | select(endswith(".app"))' <<< "$ARTIFACT_PATHS" | head -n 1)
+          test -n "$app_path"
+          codesign --verify --deep --strict --verbose=4 "$app_path"
       - name: collect artifact paths
         id: artifacts
         env:
