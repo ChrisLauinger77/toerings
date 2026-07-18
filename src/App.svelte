@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri"
-  import { appWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window"
+  import { appWindow, currentMonitor, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window"
   import { listen } from "@tauri-apps/api/event"
   import { sum, pick } from "lodash-es"
   import { onMount } from "svelte"
@@ -51,6 +51,30 @@
     }
   }
 
+  async function resizeWindow(showPreferences: boolean) {
+    try {
+      await appWindow.setSize(new LogicalSize(showPreferences ? 650 : 325, 850))
+      if (!showPreferences || !preferencesVisible) return
+
+      const [monitor, position, size] = await Promise.all([
+        currentMonitor(),
+        appWindow.outerPosition(),
+        appWindow.outerSize()
+      ])
+      if (!monitor || !preferencesVisible) return
+
+      const minX = monitor.position.x
+      const maxX = minX + monitor.size.width - size.width
+      const visibleX = Math.min(Math.max(position.x, minX), Math.max(minX, maxX))
+
+      if (visibleX !== position.x) {
+        await appWindow.setPosition(new PhysicalPosition(visibleX, position.y))
+      }
+    } catch {
+      // Keep the current window geometry if monitor information is unavailable.
+    }
+  }
+
   onMount(() => {
     let disposed = false
     const unlisteners: Array<() => void> = []
@@ -89,11 +113,7 @@
     }
   })
 
-  $: if (preferencesVisible) {
-    appWindow.setSize(new LogicalSize(650, 850))
-  } else {
-    appWindow.setSize(new LogicalSize(325, 850))
-  }
+  $: resizeWindow(preferencesVisible)
 
   function onKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") {
