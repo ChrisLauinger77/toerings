@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri"
-  import { appWindow, LogicalSize } from "@tauri-apps/api/window"
+  import { appWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window"
   import { listen } from "@tauri-apps/api/event"
   import { sum, pick } from "lodash-es"
   import { onMount } from "svelte"
@@ -22,13 +22,71 @@
   import NetWidget from "./components/NetWidget.svelte"
   import Preferences from "./components/Preferences.svelte"
 
+  const windowPositionStorageKey = "toerings.window-position.v1"
+
   let preferencesVisible = false
 
+  function loadWindowPosition(): PhysicalPosition | null {
+    try {
+      const stored = localStorage.getItem(windowPositionStorageKey)
+      if (!stored) return null
+
+      const position = JSON.parse(stored)
+      if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) return null
+
+      return new PhysicalPosition(position.x, position.y)
+    } catch {
+      return null
+    }
+  }
+
+  function saveWindowPosition(position: PhysicalPosition) {
+    try {
+      localStorage.setItem(
+        windowPositionStorageKey,
+        JSON.stringify({ x: position.x, y: position.y })
+      )
+    } catch {
+      // Keep the window usable when storage is unavailable.
+    }
+  }
+
   onMount(() => {
-    const unlisten = listen("openPreferences", () => {
-      preferencesVisible = true
-    })
-    return unlisten
+    let disposed = false
+    const unlisteners: Array<() => void> = []
+
+    async function setupWindow() {
+      const savedPosition = loadWindowPosition()
+      if (savedPosition) {
+        try {
+          await appWindow.setPosition(savedPosition)
+        } catch {
+          // Fall back to the configured position if restoring fails.
+        }
+      }
+
+      const listeners = await Promise.all([
+        listen("openPreferences", () => {
+          preferencesVisible = true
+        }),
+        appWindow.onMoved(({ payload }) => {
+          saveWindowPosition(payload)
+        })
+      ])
+
+      if (disposed) {
+        listeners.forEach(unlisten => unlisten())
+      } else {
+        unlisteners.push(...listeners)
+      }
+    }
+
+    setupWindow()
+
+    return () => {
+      disposed = true
+      unlisteners.forEach(unlisten => unlisten())
+    }
   })
 
   $: if (preferencesVisible) {

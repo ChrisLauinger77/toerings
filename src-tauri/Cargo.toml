@@ -17,7 +17,7 @@ tauri-build = { version = "1.2", features = [] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_millis = "0.1.1"
-tauri = { version = "1.2", features = ["macos-private-api", "shell-open", "window-set-size", "window-start-dragging"] }
+tauri = { version = "1.2", features = ["macos-private-api", "shell-open", "window-set-position", "window-set-size", "window-start-dragging"] }
 sysinfo = "0.27.7"
 anyhow = "1.0.68"
 backtrace = "0.3.67"

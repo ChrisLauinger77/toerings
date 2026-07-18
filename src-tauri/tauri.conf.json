@@ -15,7 +15,8 @@
       "all": false,
       "window": {
         "startDragging": true,
-        "setSize": true
+        "setSize": true,
+        "setPosition": true
       },
       "shell": {
         "all": false,
