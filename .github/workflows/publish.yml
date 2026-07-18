@@ -62,7 +62,13 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 18
-      - name: install Rust stable
+      - name: install Rust 1.66.1 (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: dtolnay/rust-toolchain@1.66.1
+        with:
+          targets: ${{ matrix.rust-targets }}
+      - name: install Rust stable (macos only)
+        if: matrix.platform != 'ubuntu-22.04'
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust-targets }}
