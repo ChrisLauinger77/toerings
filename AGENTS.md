@@ -2,19 +2,19 @@
 
 ## Project overview
 
-ToeRings is a desktop system monitor built with Tauri 1. The frontend uses Svelte 3,
+ToeRings is a desktop system monitor built with Tauri 2. The frontend uses Svelte 3,
 TypeScript, and Vite. The Rust backend gathers system information and exposes it to the
 frontend through a Tauri command.
 
 - `src/`: Svelte application, widgets, styles, actions, and stores.
 - `src/lib/stores.ts`: persisted color and font preferences.
 - `src-tauri/src/`: Rust application and system-data collectors.
-- `src-tauri/tauri.conf.json`: Tauri 1 application and bundle configuration.
+- `src-tauri/tauri.conf.json`: Tauri 2 application and bundle configuration.
 - `.github/workflows/build.yml`: pull-request and manually dispatched builds.
 - `.github/workflows/publish.yml`: tag-triggered release builds and publishing.
 
-Keep this application on Tauri 1 unless a task explicitly requests a separate Tauri 2
-migration. Do not mix migration work into maintenance or release changes.
+Keep framework and frontend upgrades separate from Tauri maintenance. Do not mix Svelte,
+Vite, or TypeScript modernization into Tauri migration or release changes.
 
 ## Development conventions
 
@@ -25,12 +25,11 @@ migration. Do not mix migration work into maintenance or release changes.
 - Keep changes focused and preserve unrelated user changes in a dirty worktree.
 - Use `npm ci` for reproducible dependency installation.
 - Use `npm run build` for the frontend production build.
-- Use `npm run tauri build -- --bundles app` for a local Tauri 1 application bundle.
+- Use `npm run tauri build -- --bundles app` for a local Tauri application bundle.
 - Run `npm run check` when changing frontend code. The repository may contain existing
   diagnostics; distinguish new errors from the established baseline.
-- Linux CI uses Rust 1.66.1 because the Tauri 1 dependency set does not compile reliably
-  with newer Rust releases. macOS CI uses stable Rust for Apple Silicon and Universal
-  builds.
+- Linux and macOS CI use stable Rust. Linux builds against WebKitGTK 4.1, the runtime used
+  by Tauri 2.
 - macOS bundles use the ad-hoc signing identity `"-"`. Strict signature verification must
   pass in CI, but the builds are not notarized and require the first-launch Gatekeeper
   steps documented in the README.
@@ -66,7 +65,7 @@ canonical tag `vX.Y.Z`; for example, `create release 0.0.1` creates `v0.0.1`.
    - the top-level version and root-package version in `package-lock.json`
    - `src-tauri/Cargo.toml` under `[package]`
    - the `toerings` package entry in `src-tauri/Cargo.lock`
-   - `src-tauri/tauri.conf.json` under `package.version`
+   - `src-tauri/tauri.conf.json` under the root `version` field
 
    Prefer `npm version X.Y.Z --no-git-tag-version` for the npm files. Update the Tauri and
    Cargo manifests deliberately, then let an appropriate Cargo check or build refresh the
