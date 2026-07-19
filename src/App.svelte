@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/tauri"
+  import { invoke } from "@tauri-apps/api/core"
+  import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
   import {
-    appWindow,
     availableMonitors,
     currentMonitor,
     LogicalSize,
@@ -29,6 +29,8 @@
   import DiskWidget from "./components/DiskWidget.svelte"
   import NetWidget from "./components/NetWidget.svelte"
   import Preferences from "./components/Preferences.svelte"
+
+  const appWindow = getCurrentWebviewWindow()
 
   const windowPositionStorageKey = "toerings.window-position.v1"
 

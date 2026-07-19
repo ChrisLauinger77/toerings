@@ -10,7 +10,10 @@ use std::sync::Mutex;
 
 use crate::utils::error;
 use data_harvester::{Data, DataCollector};
-use tauri::{AboutMetadata, CustomMenuItem, Menu, MenuItem, Submenu};
+use tauri::{
+    menu::{AboutMetadata, Menu, MenuItemBuilder, PredefinedMenuItem, Submenu},
+    Emitter, Manager,
+};
 
 #[cfg(target_family = "windows")]
 pub type Pid = usize;
@@ -28,35 +31,46 @@ fn main() {
     let mut data_state = DataCollector::new();
     data_state.init();
 
-    let preferences = CustomMenuItem::new("preferences", "Open Preferences").accelerator("cmd+,");
-    let submenu = Submenu::new(
-        "Menu",
-        Menu::new()
-            .add_item(preferences)
-            .add_native_item(MenuItem::SelectAll)
-            .add_native_item(MenuItem::Copy)
-            .add_native_item(MenuItem::Quit)
-            .add_native_item(MenuItem::About(
-                "ToeRings".to_string(),
-                AboutMetadata::new()
-                    .version(env!("CARGO_PKG_VERSION"))
-                    .authors(
+    tauri::Builder::default()
+        .manage(Mutex::new(data_state))
+        .menu(|handle| {
+            let preferences = MenuItemBuilder::with_id("preferences", "Open Preferences")
+                .accelerator("CmdOrCtrl+,")
+                .build(handle)?;
+            let select_all = PredefinedMenuItem::select_all(handle, None)?;
+            let copy = PredefinedMenuItem::copy(handle, None)?;
+            let quit = PredefinedMenuItem::quit(handle, None)?;
+            let about = PredefinedMenuItem::about(
+                handle,
+                Some("About ToeRings"),
+                Some(AboutMetadata {
+                    name: Some("ToeRings".to_string()),
+                    version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                    authors: Some(
                         env!("CARGO_PKG_AUTHORS")
                             .split(":")
                             .map(String::from)
                             .collect(),
-                    )
-                    .license("MIT"),
-            )),
-    );
-    let menu = Menu::new().add_submenu(submenu);
+                    ),
+                    license: Some("MIT".to_string()),
+                    ..Default::default()
+                }),
+            )?;
+            let submenu = Submenu::with_items(
+                handle,
+                "Menu",
+                true,
+                &[&preferences, &select_all, &copy, &quit, &about],
+            )?;
 
-    tauri::Builder::default()
-        .manage(Mutex::new(data_state))
-        .menu(menu)
-        .on_menu_event(|event| match event.menu_item_id() {
-            "preferences" => event.window().emit("openPreferences", ()).unwrap(),
-            _ => {}
+            Menu::with_items(handle, &[&submenu])
+        })
+        .on_menu_event(|app, event| {
+            if event.id().as_ref() == "preferences" {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.emit("openPreferences", ());
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![collect_data])
         .run(tauri::generate_context!())

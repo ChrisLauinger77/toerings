@@ -1,64 +1,52 @@
 {
+  "$schema": "https://schema.tauri.app/config/2",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist",
-    "withGlobalTauri": false
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420"
   },
-  "package": {
-    "productName": "ToeRings",
-    "version": "0.0.1"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "window": {
-        "startDragging": true,
-        "setSize": true,
-        "setPosition": true
-      },
-      "shell": {
-        "all": false,
-        "open": true
-      }
+  "bundle": {
+    "active": true,
+    "category": "DeveloperTool",
+    "copyright": "",
+    "targets": "all",
+    "externalBin": [],
+    "icon": [
+      "icons/logo-400x400.png"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
     },
-    "bundle": {
-      "active": true,
-      "category": "DeveloperTool",
-      "copyright": "",
+    "longDescription": "",
+    "macOS": {
+      "entitlements": null,
+      "exceptionDomain": "",
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": "-"
+    },
+    "resources": [],
+    "shortDescription": "",
+    "linux": {
       "deb": {
         "depends": []
-      },
-      "externalBin": [],
-      "icon": [
-        "icons/logo-400x400.png"
-      ],
-      "identifier": "io.toerings",
-      "longDescription": "",
-      "macOS": {
-        "entitlements": null,
-        "exceptionDomain": "",
-        "frameworks": [],
-        "providerShortName": null,
-        "signingIdentity": "-"
-      },
-      "resources": [],
-      "shortDescription": "",
-      "targets": "all",
-      "windows": {
-        "certificateThumbprint": null,
-        "digestAlgorithm": "sha256",
-        "timestampUrl": ""
       }
-    },
+    }
+  },
+  "productName": "ToeRings",
+  "mainBinaryName": "ToeRings",
+  "version": "0.0.1",
+  "identifier": "io.toerings",
+  "plugins": {},
+  "app": {
+    "withGlobalTauri": false,
+    "macOSPrivateApi": true,
     "security": {
       "csp": null
     },
-    "updater": {
-      "active": false
-    },
-    "macOSPrivateApi": true,
     "windows": [
       {
         "fullscreen": false,
@@ -69,7 +57,8 @@
         "resizable": true,
         "title": "toerings",
         "decorations": false,
-        "transparent": true
+        "transparent": true,
+        "useHttpsScheme": true
       }
     ]
   }
