@@ -32,7 +32,7 @@
     { key: "CPU Load:", value: cpuData.cpuLoads.at(-1).toFixed(2) }
   ]
   $: cpuSortedProcesses = [...processList]
-    .sort((a, b) => a.cpu_usage_percent < b.cpu_usage_percent)
+    .sort((a, b) => b.cpu_usage_percent - a.cpu_usage_percent)
     .slice(0, 5)
 </script>
 

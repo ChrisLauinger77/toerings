@@ -38,7 +38,7 @@
   }
 
   $: memSortedProcesses = [...processList]
-    .sort((a, b) => a.mem_usage_bytes < b.mem_usage_bytes)
+    .sort((a, b) => b.mem_usage_bytes - a.mem_usage_bytes)
     .slice(0, 5)
 </script>
 
