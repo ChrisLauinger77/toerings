@@ -17,6 +17,10 @@
   function closePreferences() {
     preferencesVisible = false
   }
+
+  function updateFontFamily(event: Event) {
+    fontFamily.set((event.currentTarget as HTMLInputElement).value)
+  }
 </script>
 
 <aside>
@@ -78,7 +82,7 @@
           type="text"
           id="font-family"
           value={get(fontFamily)}
-          on:change={e => fontFamily.set(e.target.value)}
+          on:change={updateFontFamily}
           placeholder="Avenir, Arial"
         />
       </div>

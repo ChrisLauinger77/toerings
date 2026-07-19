@@ -20,14 +20,16 @@
   }
 
   $: pathSortedDisks = uniqBy(
-    [...diskData].sort((a, b) => a.mount_point > b.mount_point),
+    [...diskData].sort((a, b) => a.mount_point.localeCompare(b.mount_point)),
     disk => `${disk.free_space},${disk.used_space},${disk.total_space}`
   )
 
   $: ioSortedProcesses = [...processList]
     .sort(
       (a, b) =>
-        a.write_bytes_per_sec + a.read_bytes_per_sec < b.write_bytes_per_sec + b.read_bytes_per_sec
+        b.write_bytes_per_sec +
+        b.read_bytes_per_sec -
+        (a.write_bytes_per_sec + a.read_bytes_per_sec)
     )
     .slice(0, 5)
 
