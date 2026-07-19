@@ -39,7 +39,9 @@ fn main() {
                 .build(handle)?;
             let select_all = PredefinedMenuItem::select_all(handle, None)?;
             let copy = PredefinedMenuItem::copy(handle, None)?;
-            let quit = PredefinedMenuItem::quit(handle, None)?;
+            let quit = MenuItemBuilder::with_id("quit", "Quit ToeRings")
+                .accelerator("CmdOrCtrl+Q")
+                .build(handle)?;
             let about = PredefinedMenuItem::about(
                 handle,
                 Some("About ToeRings"),
@@ -73,10 +75,14 @@ fn main() {
             Menu::with_items(handle, &[&submenu])
         })
         .on_menu_event(|app, event| {
-            if event.id().as_ref() == "preferences" {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.emit("openPreferences", ());
+            match event.id().as_ref() {
+                "preferences" => {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.emit("openPreferences", ());
+                    }
                 }
+                "quit" => app.exit(0),
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![collect_data])
