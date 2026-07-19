@@ -95,6 +95,7 @@
         appWindow.outerPosition(),
         appWindow.outerSize()
       ])
+      if (request !== resizeRequest) return
 
       await appWindow.setSize(new LogicalSize(showPreferences ? 650 : 325, 850))
       const size = await appWindow.outerSize()
