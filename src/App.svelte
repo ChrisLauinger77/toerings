@@ -1,6 +1,14 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri"
-  import { appWindow, currentMonitor, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window"
+  import {
+    appWindow,
+    availableMonitors,
+    currentMonitor,
+    LogicalSize,
+    PhysicalPosition,
+    type Monitor,
+    type PhysicalSize
+  } from "@tauri-apps/api/window"
   import { listen } from "@tauri-apps/api/event"
   import { sum, pick } from "lodash-es"
   import { onMount } from "svelte"
@@ -53,6 +61,32 @@
     }
   }
 
+  function clampWindowPosition(
+    position: PhysicalPosition,
+    size: PhysicalSize,
+    monitors: Monitor[]
+  ): PhysicalPosition | null {
+    let closestPosition: PhysicalPosition | null = null
+    let closestDistance = Number.POSITIVE_INFINITY
+
+    for (const monitor of monitors) {
+      const minX = monitor.position.x
+      const minY = monitor.position.y
+      const maxX = minX + Math.max(0, monitor.size.width - size.width)
+      const maxY = minY + Math.max(0, monitor.size.height - size.height)
+      const x = Math.min(Math.max(position.x, minX), maxX)
+      const y = Math.min(Math.max(position.y, minY), maxY)
+      const distance = (x - position.x) ** 2 + (y - position.y) ** 2
+
+      if (distance < closestDistance) {
+        closestDistance = distance
+        closestPosition = new PhysicalPosition(x, y)
+      }
+    }
+
+    return closestPosition
+  }
+
   async function resizeWindow(showPreferences: boolean) {
     const request = ++resizeRequest
 
@@ -101,7 +135,12 @@
       const savedPosition = loadWindowPosition()
       if (savedPosition) {
         try {
-          await appWindow.setPosition(savedPosition)
+          const [size, monitors] = await Promise.all([
+            appWindow.outerSize(),
+            availableMonitors()
+          ])
+          const restoredPosition = clampWindowPosition(savedPosition, size, monitors)
+          if (restoredPosition) await appWindow.setPosition(restoredPosition)
         } catch {
           // Fall back to the configured position if restoring fails.
         }
