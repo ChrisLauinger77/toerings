@@ -1,6 +1,6 @@
 [package]
 name = "toerings"
-version = "0.1.0"
+version = "0.1.1"
 description = "A spiritual port of Conky SeaMod to Tauri."
 authors = ["ChrisLauinger77 <ChrisLauinger77@users.noreply.github.com>"]
 license = "MIT"

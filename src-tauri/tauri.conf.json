@@ -13,6 +13,7 @@
     "targets": "all",
     "externalBin": [],
     "icon": [
+      "icons/logo-256x256.png",
       "icons/logo-400x400.png"
     ],
     "windows": {
@@ -38,7 +39,7 @@
   },
   "productName": "ToeRings",
   "mainBinaryName": "ToeRings",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "io.toerings",
   "plugins": {},
   "app": {
