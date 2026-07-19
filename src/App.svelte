@@ -1,6 +1,14 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri"
-  import { appWindow, LogicalSize } from "@tauri-apps/api/window"
+  import {
+    appWindow,
+    availableMonitors,
+    currentMonitor,
+    LogicalSize,
+    PhysicalPosition,
+    type Monitor,
+    type PhysicalSize
+  } from "@tauri-apps/api/window"
   import { listen } from "@tauri-apps/api/event"
   import { sum, pick } from "lodash-es"
   import { onMount } from "svelte"
@@ -22,20 +30,148 @@
   import NetWidget from "./components/NetWidget.svelte"
   import Preferences from "./components/Preferences.svelte"
 
+  const windowPositionStorageKey = "toerings.window-position.v1"
+
   let preferencesVisible = false
+  let preferencesOnLeft = false
+  let resizeRequest = 0
+
+  function loadWindowPosition(): PhysicalPosition | null {
+    try {
+      const stored = localStorage.getItem(windowPositionStorageKey)
+      if (!stored) return null
+
+      const position = JSON.parse(stored)
+      if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) return null
+
+      return new PhysicalPosition(position.x, position.y)
+    } catch {
+      return null
+    }
+  }
+
+  function saveWindowPosition(position: PhysicalPosition) {
+    try {
+      localStorage.setItem(
+        windowPositionStorageKey,
+        JSON.stringify({ x: position.x, y: position.y })
+      )
+    } catch {
+      // Keep the window usable when storage is unavailable.
+    }
+  }
+
+  function clampWindowPosition(
+    position: PhysicalPosition,
+    size: PhysicalSize,
+    monitors: Monitor[]
+  ): PhysicalPosition | null {
+    let closestPosition: PhysicalPosition | null = null
+    let closestDistance = Number.POSITIVE_INFINITY
+
+    for (const monitor of monitors) {
+      const minX = monitor.position.x
+      const minY = monitor.position.y
+      const maxX = minX + Math.max(0, monitor.size.width - size.width)
+      const maxY = minY + Math.max(0, monitor.size.height - size.height)
+      const x = Math.min(Math.max(position.x, minX), maxX)
+      const y = Math.min(Math.max(position.y, minY), maxY)
+      const distance = (x - position.x) ** 2 + (y - position.y) ** 2
+
+      if (distance < closestDistance) {
+        closestDistance = distance
+        closestPosition = new PhysicalPosition(x, y)
+      }
+    }
+
+    return closestPosition
+  }
+
+  async function resizeWindow(showPreferences: boolean) {
+    const request = ++resizeRequest
+
+    try {
+      const [position, previousSize] = await Promise.all([
+        appWindow.outerPosition(),
+        appWindow.outerSize()
+      ])
+      if (request !== resizeRequest) return
+
+      await appWindow.setSize(new LogicalSize(showPreferences ? 650 : 325, 850))
+      const size = await appWindow.outerSize()
+      if (request !== resizeRequest) return
+
+      if (!showPreferences) {
+        if (preferencesOnLeft) {
+          await appWindow.setPosition(
+            new PhysicalPosition(position.x + previousSize.width - size.width, position.y)
+          )
+        }
+        preferencesOnLeft = false
+        return
+      }
+
+      const monitor = await currentMonitor()
+      if (!monitor || !preferencesVisible || request !== resizeRequest) return
+
+      const minX = monitor.position.x
+      const monitorRight = minX + monitor.size.width
+      preferencesOnLeft = position.x + size.width > monitorRight
+
+      if (preferencesOnLeft) {
+        const widthDifference = size.width - previousSize.width
+        const expandedX = Math.max(minX, position.x - widthDifference)
+        await appWindow.setPosition(new PhysicalPosition(expandedX, position.y))
+      }
+    } catch {
+      // Keep the current window geometry if monitor information is unavailable.
+    }
+  }
 
   onMount(() => {
-    const unlisten = listen("openPreferences", () => {
-      preferencesVisible = true
-    })
-    return unlisten
+    let disposed = false
+    const unlisteners: Array<() => void> = []
+
+    async function setupWindow() {
+      const savedPosition = loadWindowPosition()
+      if (savedPosition) {
+        try {
+          const [size, monitors] = await Promise.all([
+            appWindow.outerSize(),
+            availableMonitors()
+          ])
+          const restoredPosition = clampWindowPosition(savedPosition, size, monitors)
+          if (restoredPosition) await appWindow.setPosition(restoredPosition)
+        } catch {
+          // Fall back to the configured position if restoring fails.
+        }
+      }
+
+      const listeners = await Promise.all([
+        listen("openPreferences", () => {
+          preferencesVisible = true
+        }),
+        appWindow.onMoved(({ payload }) => {
+          saveWindowPosition(payload)
+        })
+      ])
+
+      if (disposed) {
+        listeners.forEach(unlisten => unlisten())
+      } else {
+        unlisteners.push(...listeners)
+      }
+    }
+
+    setupWindow()
+
+    return () => {
+      disposed = true
+      unlisteners.forEach(unlisten => unlisten())
+    }
   })
 
-  $: if (preferencesVisible) {
-    appWindow.setSize(new LogicalSize(650, 850))
-  } else {
-    appWindow.setSize(new LogicalSize(325, 850))
-  }
+  $: resizeWindow(preferencesVisible)
 
   function onKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") {
@@ -141,7 +277,7 @@
 
 <svelte:window on:keydown={onKeydown} />
 
-<div class="flex" use:styleVars={cssVars}>
+<div class:preferences-left={preferencesOnLeft} class="flex" use:styleVars={cssVars}>
   <main>
     <SummaryWidget {summaryData} />
     <CPUWidget {cpuData} {tempData} {processList} />
@@ -159,6 +295,10 @@
   .flex {
     background-color: var(--backgroundColor);
     display: flex;
+  }
+
+  .preferences-left {
+    flex-direction: row-reverse;
   }
 
   main {

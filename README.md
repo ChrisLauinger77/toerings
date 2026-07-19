@@ -9,6 +9,25 @@ I copied a lot of the Rust code from [Bottom](https://github.com/ClementTsang/bo
 
 The name "ToeRings" just sounds like Tauri, and contains the word "rings".
 
+## Install on macOS
+
+Download the Apple Silicon or Universal bundle from the GitHub release assets and move
+`ToeRings.app` to the Applications folder.
+
+The macOS builds are ad-hoc signed, but they cannot be notarized without a paid Apple
+Developer Program membership. On first launch:
+
+1. Control-click `ToeRings.app` in Finder and choose **Open**.
+2. Confirm **Open** in the security dialog.
+
+If macOS still blocks the app, open **System Settings → Privacy & Security**, find the
+ToeRings message, and choose **Open Anyway**. As a final option, remove the quarantine
+attribute from a build you downloaded from this repository and trust:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/ToeRings.app"
+```
+
 ## Install from Source
 
 You can build the executable locally. Requires you to have NodeJS and Rust installed.
