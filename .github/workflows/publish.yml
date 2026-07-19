@@ -130,7 +130,7 @@ jobs:
               draft: false,
               prerelease: false
             })
-      - name: request Homebrew cask update
+      - name: "request Homebrew cask update"
         env:
           HOMEBREW_CASK_DISPATCH_TOKEN: ${{ secrets.HOMEBREW_CASK_DISPATCH_TOKEN }}
         run: |
