@@ -2,6 +2,11 @@
 
 A theme-able system monitoring tool.
 
+[![Github Latest Releases](https://img.shields.io/github/downloads/ChrisLauinger77/toerings/latest/total)]()
+[![Version](https://img.shields.io/github/v/release/ChrisLauinger77/toerings)]()
+[![Github All Releases](https://img.shields.io/github/downloads/ChrisLauinger77/toerings/total.svg)]()
+[![license](https://img.shields.io/github/license/ChrisLauinger77/toerings)]()
+
 ![examples](./public/example-all.png)
 
 I tried to port the [Seamod](https://github.com/maxiwell/conky-seamod) Conky theme to Tauri.
