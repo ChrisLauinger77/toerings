@@ -46,13 +46,20 @@ fn main() {
                 Some(AboutMetadata {
                     name: Some("ToeRings".to_string()),
                     version: Some(env!("CARGO_PKG_VERSION").to_string()),
-                    authors: Some(
-                        env!("CARGO_PKG_AUTHORS")
-                            .split(":")
-                            .map(String::from)
-                            .collect(),
+                    authors: Some(vec!["ChrisLauinger77".to_string()]),
+                    comments: Some(
+                        "Forked from upstream:\nhttps://github.com/acarl005/toerings".to_string(),
                     ),
                     license: Some("MIT".to_string()),
+                    website: Some("https://github.com/ChrisLauinger77/toerings".to_string()),
+                    website_label: Some(
+                        "github.com/ChrisLauinger77/toerings".to_string(),
+                    ),
+                    credits: Some(
+                        "Repository\nhttps://github.com/ChrisLauinger77/toerings\n\n\
+                         Upstream (fork source)\nhttps://github.com/acarl005/toerings"
+                            .to_string(),
+                    ),
                     ..Default::default()
                 }),
             )?;

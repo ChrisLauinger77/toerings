@@ -2,9 +2,9 @@
 name = "toerings"
 version = "0.0.1"
 description = "A spiritual port of Conky SeaMod to Tauri."
-authors = ["Andrew Carlson <2yinyang2@gmail.com>"]
+authors = ["ChrisLauinger77"]
 license = "MIT"
-repository = "https://github.com/acarl005/toerings"
+repository = "https://github.com/ChrisLauinger77/toerings"
 edition = "2021"
 rust-version = "1.88"
 
