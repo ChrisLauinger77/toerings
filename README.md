@@ -16,8 +16,15 @@ The name "ToeRings" just sounds like Tauri, and contains the word "rings".
 
 ## Install on macOS
 
-Download the Apple Silicon or Universal bundle from the GitHub release assets and move
-`ToeRings.app` to the Applications folder.
+Install ToeRings with [Homebrew](https://brew.sh/):
+
+```sh
+brew trust ChrisLauinger77/cask
+brew install --cask chrislauinger77/cask/toerings
+```
+
+Alternatively, download the Apple Silicon or Universal bundle from the GitHub release assets
+and move `ToeRings.app` to the Applications folder.
 
 The macOS builds are ad-hoc signed, but they cannot be notarized without a paid Apple
 Developer Program membership. On first launch:
