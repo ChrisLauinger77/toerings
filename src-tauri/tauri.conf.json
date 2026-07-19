@@ -13,6 +13,7 @@
     "targets": "all",
     "externalBin": [],
     "icon": [
+      "icons/logo-256x256.png",
       "icons/logo-400x400.png"
     ],
     "windows": {

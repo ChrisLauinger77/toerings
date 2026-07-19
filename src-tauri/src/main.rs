@@ -79,6 +79,13 @@ fn main() {
                 "preferences" => {
                     if let Some(window) = app.get_webview_window("main") {
                         let _ = window.emit("openPreferences", ());
+                        #[cfg(target_os = "linux")]
+                        {
+                            let window = window.clone();
+                            let _ = app.run_on_main_thread(move || {
+                                let _ = window.set_focus();
+                            });
+                        }
                     }
                 }
                 "quit" => app.exit(0),
