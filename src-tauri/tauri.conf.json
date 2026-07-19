@@ -20,7 +20,7 @@
       "digestAlgorithm": "sha256",
       "timestampUrl": ""
     },
-    "longDescription": "",
+    "longDescription": "A lightweight desktop system monitor inspired by Conky SeaMod.",
     "macOS": {
       "entitlements": null,
       "exceptionDomain": "",
@@ -29,7 +29,7 @@
       "signingIdentity": "-"
     },
     "resources": [],
-    "shortDescription": "",
+    "shortDescription": "A lightweight desktop system monitor.",
     "linux": {
       "deb": {
         "depends": []
