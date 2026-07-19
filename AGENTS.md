@@ -65,7 +65,7 @@ canonical tag `vX.Y.Z`; for example, `create release 0.0.1` creates `v0.0.1`.
    - the top-level version and root-package version in `package-lock.json`
    - `src-tauri/Cargo.toml` under `[package]`
    - the `toerings` package entry in `src-tauri/Cargo.lock`
-   - `src-tauri/tauri.conf.json` under `package.version`
+   - `src-tauri/tauri.conf.json` under the root `version` field
 
    Prefer `npm version X.Y.Z --no-git-tag-version` for the npm files. Update the Tauri and
    Cargo manifests deliberately, then let an appropriate Cargo check or build refresh the
