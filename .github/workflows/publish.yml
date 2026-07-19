@@ -46,12 +46,18 @@ jobs:
           - platform: ubuntu-22.04
             rust-targets: x86_64-unknown-linux-gnu
             tauri-args: ""
+            upload-with-tauri: true
+            archive-arch: ""
           - platform: macos-15
             rust-targets: aarch64-apple-darwin
-            tauri-args: "--target aarch64-apple-darwin"
+            tauri-args: "--target aarch64-apple-darwin --bundles app"
+            upload-with-tauri: false
+            archive-arch: "aarch64"
           - platform: macos-15
             rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
-            tauri-args: "--target universal-apple-darwin"
+            tauri-args: "--target universal-apple-darwin --bundles app"
+            upload-with-tauri: false
+            archive-arch: "universal"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -82,7 +88,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          releaseId: ${{ needs.create-release.outputs.release_id }}
+          releaseId: ${{ matrix['upload-with-tauri'] && needs.create-release.outputs.release_id || '' }}
           args: ${{ matrix.tauri-args }}
       - name: verify macOS app signature
         if: startsWith(matrix.platform, 'macos')
@@ -92,6 +98,16 @@ jobs:
           app_path=$(jq -r '.[] | select(endswith(".app"))' <<< "$ARTIFACT_PATHS" | head -n 1)
           test -n "$app_path"
           codesign --verify --deep --strict --verbose=4 "$app_path"
+      - name: upload macOS app archive
+        if: startsWith(matrix.platform, 'macos')
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          app_path=$(jq -r '.[] | select(endswith(".app"))' <<< "$ARTIFACT_PATHS" | head -n 1)
+          archive_path="$RUNNER_TEMP/ToeRings_${GITHUB_REF_NAME#v}_${{ matrix['archive-arch'] }}.app.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" "$archive_path"
+          gh release upload "$GITHUB_REF_NAME" "$archive_path"
 
   publish-release:
     permissions:
