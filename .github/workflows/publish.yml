@@ -31,7 +31,8 @@ jobs:
                 "macOS builds are ad-hoc signed but cannot be notarized without a paid Apple Developer Program membership. On first launch, Control-click ToeRings and choose Open. See the README for additional Gatekeeper instructions."
               ].join("\n"),
               draft: true,
-              prerelease: false
+              prerelease: false,
+              generate_release_notes: true
             })
             return data.id
 
@@ -46,17 +47,14 @@ jobs:
           - platform: ubuntu-22.04
             rust-targets: x86_64-unknown-linux-gnu
             tauri-args: ""
-            upload-with-tauri: true
             archive-arch: ""
           - platform: macos-15
             rust-targets: aarch64-apple-darwin
             tauri-args: "--target aarch64-apple-darwin --bundles app"
-            upload-with-tauri: false
             archive-arch: "aarch64"
           - platform: macos-15
             rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
             tauri-args: "--target universal-apple-darwin --bundles app"
-            upload-with-tauri: false
             archive-arch: "universal"
 
     runs-on: ${{ matrix.platform }}
@@ -74,7 +72,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf rpm squashfs-tools xvfb
       - name: install frontend dependencies
         run: npm ci
       - uses: tauri-apps/tauri-action@v0
@@ -82,8 +80,35 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          releaseId: ${{ matrix['upload-with-tauri'] && needs.create-release.outputs.release_id || '' }}
           args: ${{ matrix.tauri-args }}
+      - name: repack AppImage without host infrastructure libraries
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+        run: |
+          appimage_path=$(jq -r '.[] | select(endswith(".AppImage"))' <<< "$ARTIFACT_PATHS")
+          test -n "$appimage_path"
+          scripts/repack-appimage.sh "$appimage_path"
+      - name: validate Linux bundles
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+        run: |
+          deb_path=$(jq -r '.[] | select(endswith(".deb"))' <<< "$ARTIFACT_PATHS")
+          rpm_path=$(jq -r '.[] | select(endswith(".rpm"))' <<< "$ARTIFACT_PATHS")
+          appimage_path=$(jq -r '.[] | select(endswith(".AppImage"))' <<< "$ARTIFACT_PATHS")
+          test -n "$deb_path" && test -n "$rpm_path" && test -n "$appimage_path"
+          scripts/validate-linux-bundles.sh "$deb_path" "$rpm_path" "$appimage_path"
+      - name: upload Linux bundles
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          jq -r '.[] | select(endswith(".deb") or endswith(".rpm") or endswith(".AppImage"))' \
+            <<< "$ARTIFACT_PATHS" | while read -r artifact_path; do
+              gh release upload "$GITHUB_REF_NAME" "$artifact_path"
+            done
       - name: verify macOS app signature
         if: startsWith(matrix.platform, 'macos')
         env:

@@ -14,6 +14,29 @@ I copied a lot of the Rust code from [Bottom](https://github.com/ClementTsang/bo
 
 The name "ToeRings" just sounds like Tauri, and contains the word "rings".
 
+## Install on Linux
+
+Download the package for your distribution from the GitHub release assets.
+
+Debian and Ubuntu:
+
+```sh
+sudo apt install ./ToeRings_*_amd64.deb
+```
+
+Fedora and other RPM-based distributions:
+
+```sh
+sudo dnf install ./ToeRings-*.x86_64.rpm
+```
+
+The AppImage runs without installation:
+
+```sh
+chmod +x ToeRings_*_amd64.AppImage
+./ToeRings_*_amd64.AppImage
+```
+
 ## Install on macOS
 
 Install ToeRings with [Homebrew](https://brew.sh/):
@@ -45,7 +68,7 @@ xattr -dr com.apple.quarantine "/Applications/ToeRings.app"
 You can build the executable locally. Requires you to have NodeJS and Rust installed.
 
 ```sh
-git clone https://github.com/acarl005/toerings.git
+git clone https://github.com/ChrisLauinger77/toerings.git
 cd toerings
 npm i
 npm run tauri build

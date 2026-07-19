@@ -25,7 +25,10 @@ Vite, or TypeScript modernization into Tauri migration or release changes.
 - Keep changes focused and preserve unrelated user changes in a dirty worktree.
 - Use `npm ci` for reproducible dependency installation.
 - Use `npm run build` for the frontend production build.
-- Use `npm run tauri build -- --bundles app` for a local Tauri application bundle.
+- Use `npm run tauri build` for the platform's configured local bundles.
+- Linux AppImages must be passed through `scripts/repack-appimage.sh` before distribution;
+  this prevents bundled Wayland and GLib infrastructure libraries from conflicting with
+  newer host graphics stacks.
 - Run `npm run check` when changing frontend code. The repository may contain existing
   diagnostics; distinguish new errors from the established baseline.
 - Linux and macOS CI use stable Rust. Linux builds against WebKitGTK 4.1, the runtime used
@@ -78,7 +81,7 @@ canonical tag `vX.Y.Z`; for example, `create release 0.0.1` creates `v0.0.1`.
    - `npm ci` when dependencies are not already installed from the lockfile
    - `npm run build`
    - `npm run check`, comparing failures with the known baseline
-   - `npm run tauri build -- --bundles app`
+   - `npm run tauri build`
 
    Do not tag a commit if a new relevant build or type-check failure remains unresolved.
 

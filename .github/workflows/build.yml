@@ -40,13 +40,31 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf rpm squashfs-tools xvfb
       - name: install frontend dependencies
         run: npm ci
       - uses: tauri-apps/tauri-action@v0
         id: tauri
         with:
           args: ${{ matrix.tauri-args }}
+      - name: repack AppImage without host infrastructure libraries
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+        run: |
+          appimage_path=$(jq -r '.[] | select(endswith(".AppImage"))' <<< "$ARTIFACT_PATHS")
+          test -n "$appimage_path"
+          scripts/repack-appimage.sh "$appimage_path"
+      - name: validate Linux bundles
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+        run: |
+          deb_path=$(jq -r '.[] | select(endswith(".deb"))' <<< "$ARTIFACT_PATHS")
+          rpm_path=$(jq -r '.[] | select(endswith(".rpm"))' <<< "$ARTIFACT_PATHS")
+          appimage_path=$(jq -r '.[] | select(endswith(".AppImage"))' <<< "$ARTIFACT_PATHS")
+          test -n "$deb_path" && test -n "$rpm_path" && test -n "$appimage_path"
+          scripts/validate-linux-bundles.sh "$deb_path" "$rpm_path" "$appimage_path"
       - name: verify macOS app signature
         if: startsWith(matrix.platform, 'macos')
         env:

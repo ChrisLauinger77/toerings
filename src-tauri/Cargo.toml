@@ -2,7 +2,7 @@
 name = "toerings"
 version = "0.0.1"
 description = "A spiritual port of Conky SeaMod to Tauri."
-authors = ["ChrisLauinger77"]
+authors = ["ChrisLauinger77 <ChrisLauinger77@users.noreply.github.com>"]
 license = "MIT"
 repository = "https://github.com/ChrisLauinger77/toerings"
 edition = "2021"
