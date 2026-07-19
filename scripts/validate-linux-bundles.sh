@@ -34,21 +34,29 @@ test -n "$(rpm --dbpath "$rpm_database" -qp --qf '%{SUMMARY}' "$rpm_path")"
   test ! -e squashfs-root/usr/lib/libglib-2.0.so.0
 )
 
-sudo apt-get install -y "$deb_path"
+bundle_dir=$(dirname "$(dirname "$rpm_path")")
+docker run --rm --volume "$bundle_dir:/packages:ro" ubuntu:22.04 bash -c '
+  set -euo pipefail
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y /packages/deb/*.deb
+  DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb
+  set +e
+  timeout 10s xvfb-run -a /usr/bin/ToeRings >/tmp/deb-smoke.log 2>&1
+  deb_status=$?
+  set -e
+  cat /tmp/deb-smoke.log
+  test "$deb_status" -eq 124
+'
+
 set +e
-timeout 10s xvfb-run -a /usr/bin/ToeRings >"$runner_temp/deb-smoke.log" 2>&1
-deb_status=$?
 timeout 10s env APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a "$appimage_path" \
   >"$runner_temp/appimage-smoke.log" 2>&1
 appimage_status=$?
 set -e
 
-cat "$runner_temp/deb-smoke.log"
 cat "$runner_temp/appimage-smoke.log"
-test "$deb_status" -eq 124
 test "$appimage_status" -eq 124
 ! grep -F "Could not create default EGL display" "$runner_temp/appimage-smoke.log"
 
-bundle_dir=$(dirname "$(dirname "$rpm_path")")
 docker run --rm --volume "$bundle_dir:/packages:ro" fedora:latest \
   bash -c 'dnf install -y /packages/rpm/*.rpm && rpm -q toe-rings'
