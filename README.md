@@ -65,7 +65,8 @@ xattr -dr com.apple.quarantine "/Applications/ToeRings.app"
 
 ## Install from Source
 
-You can build the executable locally. Requires you to have NodeJS and Rust installed.
+You can build the executable locally. This requires Node.js 24 or newer and Rust 1.95 or
+newer.
 
 ```sh
 git clone https://github.com/ChrisLauinger77/toerings.git
