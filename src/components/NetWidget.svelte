@@ -1,7 +1,7 @@
-<script>
-  export let networkData
-  export let localIp = null
-  export let hostname
+<script lang="ts">
+  export let networkData: { rx: Array<number>; tx: Array<number> }
+  export let localIp: string | null = null
+  export let hostname: string | null
 
   import { calcStrokeWidth, toMetric } from "../lib/utils"
   import { uPlotAction } from "../lib/actions"
@@ -10,13 +10,13 @@
   import ArcStack from "./ArcStack.svelte"
 
   $: attrs = [
-    { key: "Hostname:", value: hostname },
-    { key: "Local IP:", value: localIp }
+    { key: "Hostname:", value: hostname ?? "N/A" },
+    { key: "Local IP:", value: localIp ?? "N/A" }
   ]
 
   $: arcs = [
-    { label: "Down", value: networkData.rx.at(-1), max: 100 * 1024 ** 2 },
-    { label: "Up", value: networkData.tx.at(-1), max: 100 * 1024 ** 2 }
+    { label: "Down", value: networkData.rx.at(-1) ?? 0, max: 100 * 1024 ** 2 },
+    { label: "Up", value: networkData.tx.at(-1) ?? 0, max: 100 * 1024 ** 2 }
   ]
 
   $: inPlotData = {
@@ -37,13 +37,13 @@
     <div class="flex">
       <h2>Net</h2>
       <div class="plot-container">
-        <div use:uPlotAction={inPlotData} />
+        <div use:uPlotAction={inPlotData}></div>
         <p class="caption">
-          Down: {toMetric(networkData.rx.at(-1))}
+          Down: {toMetric(networkData.rx.at(-1) ?? 0)}
         </p>
-        <div use:uPlotAction={outPlotData} />
+        <div use:uPlotAction={outPlotData}></div>
         <p class="caption">
-          Up: {toMetric(networkData.tx.at(-1))}
+          Up: {toMetric(networkData.tx.at(-1) ?? 0)}
         </p>
       </div>
     </div>
