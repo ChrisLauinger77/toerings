@@ -4376,7 +4376,7 @@ dependencies = [
  "sysinfo",
  "tauri",
  "tauri-build",
- "thiserror 1.0.69",
+ "thiserror 2.0.19",
  "time",
  "winapi",
  "windows 0.62.2",
