@@ -1,9 +1,9 @@
 name: Generate PR 19 lockfile
 
 on:
-  push:
+  pull_request:
     branches:
-      - renovate/major-svelte-5-migration
+      - master
     paths:
       - .github/workflows/generate-pr19-lock.yml
 
