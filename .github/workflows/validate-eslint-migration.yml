@@ -1,6 +1,7 @@
 name: validate ESLint migration
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - renovate/major-eslint-migration
