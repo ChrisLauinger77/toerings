@@ -29,7 +29,7 @@
   $: avgDieTemp = mean(tempData.map(sensor => sensor.temperature))
   $: attrs = [
     { key: "CPU Temp:", value: `${avgDieTemp.toFixed(1)}°C` },
-    { key: "CPU Load:", value: cpuData.cpuLoads.at(-1).toFixed(2) }
+    { key: "CPU Load:", value: (cpuData.cpuLoads.at(-1) ?? 0).toFixed(2) }
   ]
   $: cpuSortedProcesses = [...processList]
     .sort((a, b) => b.cpu_usage_percent - a.cpu_usage_percent)

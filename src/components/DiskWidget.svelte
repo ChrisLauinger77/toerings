@@ -3,7 +3,6 @@
   export let ioData: Array<{ read: number; write: number }>
   export let processList: Array<Process>
 
-  import { basename } from "path"
   import { uniqBy } from "lodash-es"
 
   import { toMetric, calcStrokeWidth } from "../lib/utils"
@@ -16,7 +15,7 @@
     if (filepath === "/") {
       return "/"
     }
-    return basename(filepath)
+    return filepath.split(/[\\/]/).filter(Boolean).at(-1) ?? filepath
   }
 
   $: pathSortedDisks = uniqBy(
@@ -33,19 +32,26 @@
     )
     .slice(0, 5)
 
-  $: arcs = pathSortedDisks.slice(0, 4).map(disk => ({
-    label: formatPath(disk.mount_point),
-    value: disk.used_space,
-    max: disk.total_space,
-    tooltip: `${disk.name}<br/>${disk.mount_point}<br/>${(
-      (disk.used_space / disk.total_space) *
-      100
-    ).toFixed(1)}% used`
-  }))
+  $: arcs = pathSortedDisks
+    .filter(
+      (disk): disk is DiskData & { used_space: number; total_space: number } =>
+        disk.used_space !== null && disk.total_space !== null
+    )
+    .slice(0, 4)
+    .map(disk => ({
+      label: formatPath(disk.mount_point),
+      value: disk.used_space,
+      max: disk.total_space,
+      tooltip: `${disk.name}<br/>${disk.mount_point}<br/>${(
+        (disk.used_space / disk.total_space) *
+        100
+      ).toFixed(1)}% used`
+    }))
 
+  $: latestIo = ioData.at(-1) ?? { read: 0, write: 0 }
   $: attrs = [
-    { key: "Read:", value: toMetric(ioData.at(-1).read) },
-    { key: "Write:", value: toMetric(ioData.at(-1).write) }
+    { key: "Read:", value: toMetric(latestIo.read) },
+    { key: "Write:", value: toMetric(latestIo.write) }
   ]
 
   $: plotDatas = [

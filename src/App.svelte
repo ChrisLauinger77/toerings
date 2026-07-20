@@ -191,13 +191,16 @@
     os_version: null
   }
 
-  let cpuData = {
+  let cpuData: { perCoreUtil: Array<number>; cpuLoads: Array<number> } = {
     perCoreUtil: [],
     cpuLoads: Array(60).fill(0)
   }
   let processList: Array<Process> = []
   let tempData: Array<TempData> = []
-  let memData = {
+  let memData: {
+    ram: { usage: MemData; percentages: Array<number> }
+    swap: { usage: MemData }
+  } = {
     ram: {
       usage: {
         mem_total_in_kib: 0,
@@ -223,7 +226,7 @@
     tx: Array(60).fill(0)
   }
 
-  let localIp = ""
+  let localIp: string | null = null
 
   let lastDataCollection = 0
 

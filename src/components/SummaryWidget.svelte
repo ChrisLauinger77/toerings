@@ -4,7 +4,7 @@
 
 <header data-tauri-drag-region>
   <h1>System</h1>
-  <div class="divider" />
+  <div class="divider"></div>
 </header>
 
 <ul>

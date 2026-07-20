@@ -6,8 +6,8 @@
   export let trackColor = "rgba(255, 255, 255, 0.2)"
   export let capColor = "white"
   export let size = 100
-  export let label = null
-  export let tooltip = null
+  export let label: string | null = null
+  export let tooltip: string | null = null
 
   import { styleVars } from "../lib/actions"
 
@@ -60,6 +60,7 @@
     {/if}
     <div
       class="label"
+      role="tooltip"
       on:mouseenter={() => {
         showTooltip = true
       }}

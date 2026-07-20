@@ -28,10 +28,10 @@
   <div class="plot-container">
     {#each plotDatas as plotData, i}
       {#if i === 0}
-        <div use:uPlotAction={plotData} />
+        <div use:uPlotAction={plotData}></div>
       {:else}
         <div class="plot-wrap">
-          <div use:uPlotAction={plotData} />
+          <div use:uPlotAction={plotData}></div>
         </div>
       {/if}
     {/each}
