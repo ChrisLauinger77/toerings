@@ -238,7 +238,7 @@ impl DataCollector {
             );
             self.components.refresh(true);
 
-            #[cfg(target_os = "windows")]
+            #[cfg(any(target_os = "windows", target_os = "freebsd"))]
             {
                 self.networks.refresh(true);
             }
