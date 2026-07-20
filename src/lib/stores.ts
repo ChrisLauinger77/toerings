@@ -76,16 +76,24 @@ export const fontFamily = persistedFont()
 
 export type ThemeName = "default" | "midnight" | "light"
 
-const themes: Record<ThemeName, Preferences> = {
-  default: defaultPreferences,
+type Theme = Omit<Preferences, "fontFamily">
+
+const themes: Record<ThemeName, Theme> = {
+  default: {
+    foregroundColor: defaultPreferences.foregroundColor,
+    backgroundColor: defaultPreferences.backgroundColor,
+    titleColor: defaultPreferences.titleColor,
+    accentColor: defaultPreferences.accentColor,
+    arcTrackColor: defaultPreferences.arcTrackColor,
+    arcCapColor: defaultPreferences.arcCapColor
+  },
   midnight: {
     foregroundColor: "#dbeafe",
     backgroundColor: "rgba(7, 12, 24, 0.92)",
     titleColor: "#7dd3fc",
     accentColor: "#c084fc",
     arcTrackColor: "rgba(148, 163, 184, 0.22)",
-    arcCapColor: "#f8fafc",
-    fontFamily: defaultPreferences.fontFamily
+    arcCapColor: "#f8fafc"
   },
   light: {
     foregroundColor: "#243047",
@@ -93,8 +101,7 @@ const themes: Record<ThemeName, Preferences> = {
     titleColor: "#047857",
     accentColor: "#c026d3",
     arcTrackColor: "rgba(36, 48, 71, 0.18)",
-    arcCapColor: "#243047",
-    fontFamily: defaultPreferences.fontFamily
+    arcCapColor: "#243047"
   }
 }
 
@@ -106,9 +113,9 @@ export function applyTheme(theme: ThemeName) {
   accentColor.set(colord(values.accentColor))
   arcTrackColor.set(colord(values.arcTrackColor))
   arcCapColor.set(colord(values.arcCapColor))
-  fontFamily.set(values.fontFamily)
 }
 
 export function resetAppearance() {
   applyTheme("default")
+  fontFamily.set(defaultPreferences.fontFamily)
 }

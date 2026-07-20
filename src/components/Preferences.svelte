@@ -24,8 +24,10 @@
     "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
   ]
 
+  let customFontEditorOpen = false
   let selectedFont = ""
-  $: selectedFont = fontPresets.includes($fontFamily) ? $fontFamily : "custom"
+  $: selectedFont =
+    customFontEditorOpen || !fontPresets.includes($fontFamily) ? "custom" : $fontFamily
 
   function closePreferences() {
     preferencesVisible = false
@@ -37,6 +39,7 @@
 
   function updateFontPreset(event: Event) {
     const value = (event.currentTarget as HTMLSelectElement).value
+    customFontEditorOpen = value === "custom"
     if (value !== "custom") fontFamily.set(value)
   }
 
@@ -46,6 +49,11 @@
 
   function updateLocale(event: Event) {
     localeSetting.set((event.currentTarget as HTMLSelectElement).value as LocaleSetting)
+  }
+
+  function restoreDefaults() {
+    customFontEditorOpen = false
+    resetAppearance()
   }
 
   function pickerTexts(locale: Locale) {
@@ -216,7 +224,7 @@
     </div>
   </section>
 
-  <button class="reset-button" type="button" on:click={resetAppearance}>
+  <button class="reset-button" type="button" on:click={restoreDefaults}>
     {$t("preferences.restoreDefaults")}
   </button>
 </aside>
