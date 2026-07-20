@@ -41,7 +41,7 @@ libc = "0.2.139"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 heim = { git = "https://github.com/heim-rs/heim", features = ["cpu", "disk", "memory", "net", "sensors"] }
-procfs = { version = "0.14.2", default-features = false }
+procfs = { version = "0.18.0", default-features = false }
 smol = "1.2.5"
 
 [target.'cfg(target_os = "macos")'.dependencies]
