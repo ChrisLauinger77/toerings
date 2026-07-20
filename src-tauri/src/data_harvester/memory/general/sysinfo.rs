@@ -1,6 +1,6 @@
 //! Data collection for memory via sysinfo.
 
-use sysinfo::{System, SystemExt};
+use sysinfo::System;
 
 use crate::data_harvester::memory::{MemCollect, MemHarvest};
 

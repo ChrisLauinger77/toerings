@@ -14,7 +14,12 @@ use serde::Serialize;
 #[cfg(feature = "battery")]
 use starship_battery::{Battery, Manager};
 
-use sysinfo::{System, SystemExt};
+use sysinfo::System;
+
+#[cfg(not(target_os = "linux"))]
+use sysinfo::Components;
+#[cfg(any(target_os = "windows", target_os = "freebsd"))]
+use sysinfo::Networks;
 
 #[cfg(feature = "nvidia")]
 pub mod nvidia;
@@ -114,7 +119,12 @@ impl Data {
 #[derive(Debug)]
 pub struct DataCollector {
     pub data: Data,
+    #[cfg(not(target_os = "linux"))]
     sys: System,
+    #[cfg(not(target_os = "linux"))]
+    components: Components,
+    #[cfg(any(target_os = "windows", target_os = "freebsd"))]
+    networks: Networks,
     previous_cpu_times: Vec<(cpu::PastCpuWork, cpu::PastCpuTotal)>,
     previous_average_cpu_time: Option<(cpu::PastCpuWork, cpu::PastCpuTotal)>,
     #[cfg(target_os = "linux")]
@@ -142,7 +152,12 @@ impl DataCollector {
     pub fn new() -> Self {
         DataCollector {
             data: Data::default(),
-            sys: System::new_with_specifics(sysinfo::RefreshKind::new()),
+            #[cfg(not(target_os = "linux"))]
+            sys: System::new_with_specifics(sysinfo::RefreshKind::nothing()),
+            #[cfg(not(target_os = "linux"))]
+            components: Components::new_with_refreshed_list(),
+            #[cfg(any(target_os = "windows", target_os = "freebsd"))]
+            networks: Networks::new_with_refreshed_list(),
             previous_cpu_times: vec![],
             previous_average_cpu_time: None,
             #[cfg(target_os = "linux")]
@@ -177,21 +192,7 @@ impl DataCollector {
             self.sys.refresh_memory();
             self.mem_total_kb = self.sys.total_memory();
 
-            // TODO: Would be good to get this and network list running on a timer instead...?
-            // Refresh components list once...
-            self.sys.refresh_components_list();
-
-            // Refresh network list once...
-            if cfg!(target_os = "windows") {
-                self.sys.refresh_networks_list();
-            }
-
-            self.sys.refresh_cpu();
-
-            // Refresh disk list once...
-            if cfg!(target_os = "freebsd") {
-                self.sys.refresh_disks_list();
-            }
+            self.sys.refresh_cpu_all();
         }
 
         #[cfg(feature = "battery")]
@@ -226,18 +227,18 @@ impl DataCollector {
     pub async fn update_data(&mut self) {
         #[cfg(not(target_os = "linux"))]
         {
-            self.sys.refresh_cpu();
-            self.sys.refresh_processes();
-            self.sys.refresh_components();
+            self.sys.refresh_cpu_all();
+            self.sys
+                .refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+            self.components.refresh(true);
 
             #[cfg(target_os = "windows")]
             {
-                self.sys.refresh_networks();
+                self.networks.refresh(true);
             }
 
             #[cfg(target_os = "freebsd")]
             {
-                self.sys.refresh_disks();
                 self.sys.refresh_memory();
             }
         }
@@ -350,7 +351,7 @@ impl DataCollector {
 
         #[cfg(not(target_os = "linux"))]
         {
-            if let Ok(data) = temperature::get_temperature_data(&self.sys) {
+            if let Ok(data) = temperature::get_temperature_data(&self.components) {
                 self.data.temperature_sensors = data;
             }
         }
@@ -366,7 +367,7 @@ impl DataCollector {
             #[cfg(any(target_os = "windows", target_os = "freebsd"))]
             {
                 network::get_network_data(
-                    &self.sys,
+                    &self.networks,
                     self.last_collection_time,
                     &mut self.total_rx,
                     &mut self.total_tx,
@@ -437,11 +438,11 @@ impl DataCollector {
             self.data.io = io;
         }
 
-        self.data.uptime = Duration::from_secs(self.sys.uptime());
-        self.data.hostname = self.sys.host_name();
-        self.data.kernel_name = self.sys.name();
-        self.data.kernel_version = self.sys.kernel_version();
-        self.data.os_version = self.sys.long_os_version();
+        self.data.uptime = Duration::from_secs(System::uptime());
+        self.data.hostname = System::host_name();
+        self.data.kernel_name = System::name();
+        self.data.kernel_version = System::kernel_version();
+        self.data.os_version = System::long_os_version();
         self.data.local_ip = local_ip_address::local_ip().ok();
 
         // Update time

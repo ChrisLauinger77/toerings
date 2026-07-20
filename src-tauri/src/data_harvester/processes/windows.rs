@@ -1,6 +1,6 @@
 //! Process data collection for Windows.  Uses sysinfo.
 
-use sysinfo::{CpuExt, PidExt, ProcessExt, System, SystemExt};
+use sysinfo::System;
 
 use super::ProcessHarvest;
 
@@ -12,16 +12,16 @@ pub fn get_process_data(
 ) -> crate::utils::error::Result<Vec<ProcessHarvest>> {
     let mut process_vector: Vec<ProcessHarvest> = Vec::new();
     let process_hashmap = sys.processes();
-    let cpu_usage = sys.global_cpu_info().cpu_usage() as f64 / 100.0;
+    let cpu_usage = sys.global_cpu_usage() as f64 / 100.0;
     let num_processors = sys.cpus().len();
 
     for process_val in process_hashmap.values() {
         let name = if process_val.name().is_empty() {
             let process_cmd = process_val.cmd();
             if process_cmd.len() > 1 {
-                process_cmd[0].clone()
+                process_cmd[0].to_string_lossy().into_owned()
             } else {
-                let process_exe = process_val.exe().file_stem();
+                let process_exe = process_val.exe().and_then(|exe| exe.file_stem());
                 if let Some(exe) = process_exe {
                     let process_exe_opt = exe.to_str();
                     if let Some(exe_name) = process_exe_opt {
@@ -34,10 +34,15 @@ pub fn get_process_data(
                 }
             }
         } else {
-            process_val.name().to_string()
+            process_val.name().to_string_lossy().into_owned()
         };
         let command = {
-            let command = process_val.cmd().join(" ");
+            let command = process_val
+                .cmd()
+                .iter()
+                .map(|part| part.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(" ");
             if command.is_empty() {
                 name.to_string()
             } else {

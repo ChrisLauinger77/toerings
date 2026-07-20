@@ -4,19 +4,15 @@ use anyhow::Result;
 
 use super::TempHarvest;
 
-pub fn get_temperature_data(sys: &sysinfo::System) -> Result<Option<Vec<TempHarvest>>> {
-    use sysinfo::{ComponentExt, SystemExt};
-
+pub fn get_temperature_data(components: &sysinfo::Components) -> Result<Option<Vec<TempHarvest>>> {
     let mut temperature_vec: Vec<TempHarvest> = Vec::new();
 
-    let sensor_data = sys.components();
-    for component in sensor_data {
+    for component in components {
         let name = component.label().to_string();
 
-        temperature_vec.push(TempHarvest {
-            name,
-            temperature: component.temperature(),
-        });
+        if let Some(temperature) = component.temperature() {
+            temperature_vec.push(TempHarvest { name, temperature });
+        }
     }
 
     #[cfg(feature = "nvidia")]
