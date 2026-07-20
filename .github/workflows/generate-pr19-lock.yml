@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - .github/workflows/generate-pr19-lock.yml
+      - package.json
 
 permissions:
   contents: read
