@@ -13,7 +13,7 @@ type Preferences = {
   fontFamily: string
 }
 
-const defaults: Preferences = {
+export const defaultPreferences: Preferences = {
   foregroundColor: "#ffffff",
   backgroundColor: "rgba(0, 0, 0, 0.5)",
   titleColor: "#00ff00",
@@ -26,9 +26,9 @@ const defaults: Preferences = {
 function loadPreferences(): Preferences {
   try {
     const stored = localStorage.getItem(storageKey)
-    return stored ? { ...defaults, ...JSON.parse(stored) } : { ...defaults }
+    return stored ? { ...defaultPreferences, ...JSON.parse(stored) } : { ...defaultPreferences }
   } catch {
-    return { ...defaults }
+    return { ...defaultPreferences }
   }
 }
 
@@ -56,7 +56,7 @@ function persistedColor(name: keyof Preferences, fallback: string) {
 
 function persistedFont() {
   const savedFont = preferences.fontFamily
-  const store = writable(typeof savedFont === "string" ? savedFont : defaults.fontFamily)
+  const store = writable(typeof savedFont === "string" ? savedFont : defaultPreferences.fontFamily)
 
   store.subscribe(font => {
     preferences.fontFamily = font
@@ -66,10 +66,49 @@ function persistedFont() {
   return store
 }
 
-export const foregroundColor = persistedColor("foregroundColor", defaults.foregroundColor)
-export const backgroundColor = persistedColor("backgroundColor", defaults.backgroundColor)
-export const titleColor = persistedColor("titleColor", defaults.titleColor)
-export const accentColor = persistedColor("accentColor", defaults.accentColor)
-export const arcTrackColor = persistedColor("arcTrackColor", defaults.arcTrackColor)
-export const arcCapColor = persistedColor("arcCapColor", defaults.arcCapColor)
+export const foregroundColor = persistedColor("foregroundColor", defaultPreferences.foregroundColor)
+export const backgroundColor = persistedColor("backgroundColor", defaultPreferences.backgroundColor)
+export const titleColor = persistedColor("titleColor", defaultPreferences.titleColor)
+export const accentColor = persistedColor("accentColor", defaultPreferences.accentColor)
+export const arcTrackColor = persistedColor("arcTrackColor", defaultPreferences.arcTrackColor)
+export const arcCapColor = persistedColor("arcCapColor", defaultPreferences.arcCapColor)
 export const fontFamily = persistedFont()
+
+export type ThemeName = "default" | "midnight" | "light"
+
+const themes: Record<ThemeName, Preferences> = {
+  default: defaultPreferences,
+  midnight: {
+    foregroundColor: "#dbeafe",
+    backgroundColor: "rgba(7, 12, 24, 0.92)",
+    titleColor: "#7dd3fc",
+    accentColor: "#c084fc",
+    arcTrackColor: "rgba(148, 163, 184, 0.22)",
+    arcCapColor: "#f8fafc",
+    fontFamily: defaultPreferences.fontFamily
+  },
+  light: {
+    foregroundColor: "#243047",
+    backgroundColor: "rgba(248, 250, 252, 0.94)",
+    titleColor: "#047857",
+    accentColor: "#c026d3",
+    arcTrackColor: "rgba(36, 48, 71, 0.18)",
+    arcCapColor: "#243047",
+    fontFamily: defaultPreferences.fontFamily
+  }
+}
+
+export function applyTheme(theme: ThemeName) {
+  const values = themes[theme]
+  foregroundColor.set(colord(values.foregroundColor))
+  backgroundColor.set(colord(values.backgroundColor))
+  titleColor.set(colord(values.titleColor))
+  accentColor.set(colord(values.accentColor))
+  arcTrackColor.set(colord(values.arcTrackColor))
+  arcCapColor.set(colord(values.arcCapColor))
+  fontFamily.set(values.fontFamily)
+}
+
+export function resetAppearance() {
+  applyTheme("default")
+}

@@ -6,6 +6,7 @@
   import { uniqBy } from "lodash-es"
 
   import { toMetric, calcStrokeWidth } from "../lib/utils"
+  import { t } from "../lib/i18n"
   import { foregroundColor } from "../lib/stores"
   import ArcStack from "./ArcStack.svelte"
   import ArcWidget from "./ArcWidget.svelte"
@@ -45,13 +46,13 @@
       tooltip: `${disk.name}<br/>${disk.mount_point}<br/>${(
         (disk.used_space / disk.total_space) *
         100
-      ).toFixed(1)}% used`
+      ).toFixed(1)}% ${$t("disk.used")}`
     }))
 
   $: latestIo = ioData.at(-1) ?? { read: 0, write: 0 }
   $: attrs = [
-    { key: "Read:", value: toMetric(latestIo.read) },
-    { key: "Write:", value: toMetric(latestIo.write) }
+    { key: $t("disk.read"), value: toMetric(latestIo.read) },
+    { key: $t("disk.write"), value: toMetric(latestIo.write) }
   ]
 
   $: plotDatas = [
@@ -70,7 +71,7 @@
 
 <ArcWidget {attrs}>
   <ArcStack slot="arcStack" {arcs} size={120} strokeWidth={calcStrokeWidth(arcs.length)} />
-  <ProcessList slot="content" title="Disk" {plotDatas} processList={ioSortedProcesses}>
+  <ProcessList slot="content" title={$t("disk.title")} {plotDatas} processList={ioSortedProcesses}>
     <span slot="processVal" let:process>
       r:{toMetric(process.read_bytes_per_sec, 0)}, w:{toMetric(process.write_bytes_per_sec, 0)}
     </span>

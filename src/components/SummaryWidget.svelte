@@ -1,17 +1,19 @@
 <script lang="ts">
   export let summaryData: SummaryData
+
+  import { t } from "../lib/i18n"
 </script>
 
 <header data-tauri-drag-region>
-  <h1>System</h1>
+  <h1>{$t("summary.system")}</h1>
   <div class="divider"></div>
 </header>
 
 <ul>
-  <li><strong>Uptime:</strong> {summaryData.uptime}</li>
-  <li><strong>OS Version:</strong> {summaryData.os_version}</li>
+  <li><strong>{$t("summary.uptime")}</strong> {summaryData.uptime}</li>
+  <li><strong>{$t("summary.osVersion")}</strong> {summaryData.os_version}</li>
   <li>
-    <strong>Kernel:</strong>
+    <strong>{$t("summary.kernel")}</strong>
     {summaryData.kernel_name}
     {summaryData.kernel_version}
   </li>

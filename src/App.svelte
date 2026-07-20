@@ -15,6 +15,7 @@
   import "uplot/dist/uPlot.min.css"
 
   import { styleVars } from "./lib/actions"
+  import { activeLocale } from "./lib/i18n"
   import {
     foregroundColor,
     backgroundColor,
@@ -37,6 +38,14 @@
   let preferencesVisible = false
   let preferencesOnLeft = false
   let resizeRequest = 0
+  let currentMenuLocale = ""
+
+  $: if ($activeLocale !== currentMenuLocale) {
+    currentMenuLocale = $activeLocale
+    invoke("set_menu_locale", { locale: $activeLocale }).catch(() => {
+      // The web preview has no native menu to update.
+    })
+  }
 
   function loadWindowPosition(): PhysicalPosition | null {
     try {
@@ -138,10 +147,7 @@
       const savedPosition = loadWindowPosition()
       if (savedPosition) {
         try {
-          const [size, monitors] = await Promise.all([
-            appWindow.outerSize(),
-            availableMonitors()
-          ])
+          const [size, monitors] = await Promise.all([appWindow.outerSize(), availableMonitors()])
           const restoredPosition = clampWindowPosition(savedPosition, size, monitors)
           if (restoredPosition) await appWindow.setPosition(restoredPosition)
         } catch {

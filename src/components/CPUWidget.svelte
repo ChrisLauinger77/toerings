@@ -9,6 +9,7 @@
   export let tempData: Array<TempData>
 
   import { mean } from "lodash-es"
+  import { t } from "../lib/i18n"
   import { calcStrokeWidth } from "../lib/utils"
   import { foregroundColor } from "../lib/stores"
   import ArcStack from "./ArcStack.svelte"
@@ -28,8 +29,8 @@
 
   $: avgDieTemp = mean(tempData.map(sensor => sensor.temperature))
   $: attrs = [
-    { key: "CPU Temp:", value: `${avgDieTemp.toFixed(1)}°C` },
-    { key: "CPU Load:", value: (cpuData.cpuLoads.at(-1) ?? 0).toFixed(2) }
+    { key: $t("cpu.temperature"), value: `${avgDieTemp.toFixed(1)}°C` },
+    { key: $t("cpu.load"), value: (cpuData.cpuLoads.at(-1) ?? 0).toFixed(2) }
   ]
   $: cpuSortedProcesses = [...processList]
     .sort((a, b) => b.cpu_usage_percent - a.cpu_usage_percent)
@@ -38,7 +39,12 @@
 
 <ArcWidget {attrs}>
   <ArcStack slot="arcStack" {arcs} size={120} strokeWidth={calcStrokeWidth(arcs.length)} />
-  <ProcessList slot="content" title="CPU" plotDatas={[plotData]} processList={cpuSortedProcesses}>
+  <ProcessList
+    slot="content"
+    title={$t("cpu.title")}
+    plotDatas={[plotData]}
+    processList={cpuSortedProcesses}
+  >
     <span slot="processVal" let:process>{process.cpu_usage_percent.toFixed(2)}%</span>
   </ProcessList>
 </ArcWidget>

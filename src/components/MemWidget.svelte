@@ -6,6 +6,7 @@
   export let processList: Array<Process>
 
   import { toMetric, calcStrokeWidth } from "../lib/utils"
+  import { t } from "../lib/i18n"
   import { foregroundColor } from "../lib/stores"
   import ArcStack from "./ArcStack.svelte"
   import ArcWidget from "./ArcWidget.svelte"
@@ -15,21 +16,21 @@
     {
       value: memData.ram.usage.mem_used_in_kib,
       max: memData.ram.usage.mem_total_in_kib,
-      label: "RAM"
+      label: $t("memory.ram")
     },
     {
       value: memData.swap.usage.mem_used_in_kib,
       max: memData.swap.usage.mem_total_in_kib,
-      label: "Swap"
+      label: $t("memory.swap")
     }
   ]
 
   $: attrs = [
     {
-      key: "Available:",
+      key: $t("memory.available"),
       value: toMetric(memData.ram.usage.mem_total_in_kib * 1024)
     },
-    { key: "Used:", value: toMetric(memData.ram.usage.mem_used_in_kib * 1024) }
+    { key: $t("memory.used"), value: toMetric(memData.ram.usage.mem_used_in_kib * 1024) }
   ]
   $: plotData = {
     x: memData.ram.percentages.map((_, i) => i),
@@ -44,7 +45,12 @@
 
 <ArcWidget {attrs}>
   <ArcStack slot="arcStack" {arcs} size={120} strokeWidth={calcStrokeWidth(arcs.length)} />
-  <ProcessList slot="content" title="Mem" plotDatas={[plotData]} processList={memSortedProcesses}>
+  <ProcessList
+    slot="content"
+    title={$t("memory.title")}
+    plotDatas={[plotData]}
+    processList={memSortedProcesses}
+  >
     <span slot="processVal" let:process>{toMetric(process.mem_usage_bytes)}</span>
   </ProcessList>
 </ArcWidget>
