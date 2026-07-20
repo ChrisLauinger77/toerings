@@ -1,3 +1,11 @@
 {
-  "extends": ["github>ChrisLauinger77/ChrisLauinger77//renovate-config/toerings"]
+  "extends": ["github>ChrisLauinger77/ChrisLauinger77//renovate-config/toerings"],
+  "packageRules": [
+    {
+      "description": "Group Prettier and its Svelte plugin to keep peer dependencies compatible",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["prettier", "prettier-plugin-svelte"],
+      "groupName": "Prettier"
+    }
+  ]
 }
