@@ -2,7 +2,7 @@ import js from "@eslint/js"
 import tsPlugin from "@typescript-eslint/eslint-plugin"
 import tsParser from "@typescript-eslint/parser"
 import prettier from "eslint-config-prettier"
-import importX from "eslint-plugin-import-x"
+import { flatConfigs as importXFlatConfigs, importX } from "eslint-plugin-import-x"
 import svelte from "eslint-plugin-svelte"
 import globals from "globals"
 
@@ -28,6 +28,14 @@ export default [
   js.configs.recommended,
   ...tsPlugin.configs["flat/recommended"],
   ...svelte.configs["flat/recommended"],
+  {
+    ...importXFlatConfigs.recommended,
+    files: ["**/*.{js,mjs,cjs,ts}"],
+    rules: {
+      ...importXFlatConfigs.recommended.rules,
+      "import-x/no-unresolved": "off"
+    }
+  },
   {
     files: ["**/*.{js,mjs,cjs,ts,svelte}"],
     plugins: {
