@@ -32,14 +32,14 @@
       rgb={get(foregroundColor).toRgb()}
       label="Foreground color"
       isAlpha={false}
-      on:input={e => foregroundColor.set(e.detail.color)}
+      onInput={({ color }) => color && foregroundColor.set(color)}
     />
   </div>
   <div class="picker">
     <ColorPicker
       rgb={get(backgroundColor).toRgb()}
       label="Background color"
-      on:input={e => backgroundColor.set(e.detail.color)}
+      onInput={({ color }) => color && backgroundColor.set(color)}
     />
   </div>
   <div class="picker">
@@ -47,7 +47,7 @@
       rgb={get(titleColor).toRgb()}
       label="Title color"
       isAlpha={false}
-      on:input={e => titleColor.set(e.detail.color)}
+      onInput={({ color }) => color && titleColor.set(color)}
     />
   </div>
   <div class="picker">
@@ -55,7 +55,7 @@
       rgb={get(accentColor).toRgb()}
       label="Accent color"
       isAlpha={false}
-      on:input={e => accentColor.set(e.detail.color)}
+      onInput={({ color }) => color && accentColor.set(color)}
     />
   </div>
   <div class="picker">
@@ -63,7 +63,7 @@
       rgb={get(arcTrackColor).toRgb()}
       label="Arc track color"
       isAlpha={true}
-      on:input={e => arcTrackColor.set(e.detail.color)}
+      onInput={({ color }) => color && arcTrackColor.set(color)}
     />
   </div>
   <div class="picker">
@@ -71,7 +71,7 @@
       rgb={get(arcCapColor).toRgb()}
       label="Arc cap color"
       isAlpha={true}
-      on:input={e => arcCapColor.set(e.detail.color)}
+      onInput={({ color }) => color && arcCapColor.set(color)}
     />
   </div>
   <form on:submit|preventDefault={() => {}}>
