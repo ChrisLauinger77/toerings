@@ -28,9 +28,11 @@ export default [
   js.configs.recommended,
   ...tsPlugin.configs["flat/recommended"],
   ...svelte.configs["flat/recommended"],
-  importX.flatConfigs.recommended,
   {
     files: ["**/*.{js,mjs,cjs,ts,svelte}"],
+    plugins: {
+      "import-x": importX
+    },
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
@@ -50,12 +52,15 @@ export default [
       eqeqeq: "error",
       "func-names": "error",
       "import-x/order": "error",
-      "import-x/no-unresolved": "off",
       "no-unused-vars": ["error", { varsIgnorePattern: "^_", argsIgnorePattern: "^_" }],
+      "no-useless-assignment": "off",
       "no-var": "error",
       "prefer-arrow-callback": "error",
       "prefer-const": "off",
-      "require-await": "error"
+      "require-await": "error",
+      "svelte/no-at-html-tags": "off",
+      "svelte/no-reactive-reassign": "off",
+      "svelte/require-each-key": "off"
     }
   },
   {
