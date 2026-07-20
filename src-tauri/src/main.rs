@@ -62,6 +62,7 @@ fn main() {
                          Upstream (fork source)\nhttps://github.com/acarl005/toerings"
                             .to_string(),
                     ),
+                    icon: handle.default_window_icon().cloned(),
                     ..Default::default()
                 }),
             )?;
