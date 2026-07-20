@@ -4,19 +4,20 @@
   export let hostname: string | null
 
   import { calcStrokeWidth, toMetric } from "../lib/utils"
+  import { t } from "../lib/i18n"
   import { uPlotAction } from "../lib/actions"
   import { titleColor, accentColor } from "../lib/stores"
   import ArcWidget from "./ArcWidget.svelte"
   import ArcStack from "./ArcStack.svelte"
 
   $: attrs = [
-    { key: "Hostname:", value: hostname ?? "N/A" },
-    { key: "Local IP:", value: localIp ?? "N/A" }
+    { key: $t("network.hostname"), value: hostname ?? $t("common.notAvailable") },
+    { key: $t("network.localIp"), value: localIp ?? $t("common.notAvailable") }
   ]
 
   $: arcs = [
-    { label: "Down", value: networkData.rx.at(-1) ?? 0, max: 100 * 1024 ** 2 },
-    { label: "Up", value: networkData.tx.at(-1) ?? 0, max: 100 * 1024 ** 2 }
+    { label: $t("network.down"), value: networkData.rx.at(-1) ?? 0, max: 100 * 1024 ** 2 },
+    { label: $t("network.up"), value: networkData.tx.at(-1) ?? 0, max: 100 * 1024 ** 2 }
   ]
 
   $: inPlotData = {
@@ -35,15 +36,15 @@
   <ArcStack slot="arcStack" {arcs} size={120} strokeWidth={calcStrokeWidth(arcs.length)} />
   <div slot="content">
     <div class="flex">
-      <h2>Net</h2>
+      <h2>{$t("network.title")}</h2>
       <div class="plot-container">
         <div use:uPlotAction={inPlotData}></div>
         <p class="caption">
-          Down: {toMetric(networkData.rx.at(-1) ?? 0)}
+          {$t("network.down")}: {toMetric(networkData.rx.at(-1) ?? 0)}
         </p>
         <div use:uPlotAction={outPlotData}></div>
         <p class="caption">
-          Up: {toMetric(networkData.tx.at(-1) ?? 0)}
+          {$t("network.up")}: {toMetric(networkData.tx.at(-1) ?? 0)}
         </p>
       </div>
     </div>
