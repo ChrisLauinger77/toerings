@@ -153,7 +153,10 @@ impl DataCollector {
         DataCollector {
             data: Data::default(),
             #[cfg(not(target_os = "linux"))]
-            sys: System::new_with_specifics(sysinfo::RefreshKind::nothing()),
+            sys: System::new_with_specifics(
+                sysinfo::RefreshKind::nothing()
+                    .with_cpu(sysinfo::CpuRefreshKind::everything()),
+            ),
             #[cfg(not(target_os = "linux"))]
             components: Components::new_with_refreshed_list(),
             #[cfg(any(target_os = "windows", target_os = "freebsd"))]
@@ -228,8 +231,11 @@ impl DataCollector {
         #[cfg(not(target_os = "linux"))]
         {
             self.sys.refresh_cpu_all();
-            self.sys
-                .refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+            self.sys.refresh_processes_specifics(
+                sysinfo::ProcessesToUpdate::All,
+                true,
+                sysinfo::ProcessRefreshKind::everything(),
+            );
             self.components.refresh(true);
 
             #[cfg(target_os = "windows")]
