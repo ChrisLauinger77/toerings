@@ -5,19 +5,16 @@ use std::time::Instant;
 use super::NetworkHarvest;
 
 pub async fn get_network_data(
-    sys: &sysinfo::System,
+    networks: &sysinfo::Networks,
     prev_net_access_time: Instant,
     prev_net_rx: &mut u64,
     prev_net_tx: &mut u64,
     curr_time: Instant,
 ) -> crate::utils::error::Result<Option<NetworkHarvest>> {
-    use sysinfo::{NetworkExt, SystemExt};
-
     let mut total_rx: u64 = 0;
     let mut total_tx: u64 = 0;
 
-    let networks = sys.networks();
-    for (name, network) in networks {
+    for (_, network) in networks {
         total_rx += network.total_received() * 8;
         total_tx += network.total_transmitted() * 8;
     }
