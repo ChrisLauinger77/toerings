@@ -38,6 +38,7 @@ test -f "$deb_check/usr/share/icons/hicolor/256x256/apps/ToeRings.png"
   "$appimage_path" --appimage-extract >/dev/null
   test ! -e squashfs-root/usr/lib/libwayland-client.so.0
   test ! -e squashfs-root/usr/lib/libglib-2.0.so.0
+  test -f squashfs-root/usr/lib/libsystemd.so.0
   gtk_hook=squashfs-root/apprun-hooks/linuxdeploy-plugin-gtk.sh
   grep -Fx 'export WEBKIT_DISABLE_COMPOSITING_MODE=1' "$gtk_hook"
   ! grep -F 'export GDK_BACKEND=x11' "$gtk_hook"

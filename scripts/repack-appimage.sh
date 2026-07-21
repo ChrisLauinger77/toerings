@@ -50,7 +50,6 @@ excluded_libraries=(
   "libmount.so.1"
   "libpcre2-8.so.0"
   "libselinux.so.1"
-  "libsystemd.so.0"
   "libwayland-client.so.0"
   "libwayland-cursor.so.0"
   "libwayland-egl.so.1"
