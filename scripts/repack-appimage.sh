@@ -76,8 +76,18 @@ fi
 # fallback for distributions without libsystemd, but may require a newer glibc
 # than an older host provides when it comes from the AppImage build system.
 sed -i '/^source "\$this_dir"\/apprun-hooks\/"linuxdeploy-plugin-gtk.sh"$/i\
-if command -v ldconfig >\/dev\/null; then\
-  host_systemd=$(ldconfig -p 2>\/dev\/null | awk '\''$1 == "libsystemd.so.0" && $2 ~ /x86-64/ { print $NF; exit }'\'')\
+ldconfig_command=""\
+for candidate in /usr/sbin/ldconfig /sbin/ldconfig; do\
+  if [[ -x "$candidate" ]]; then\
+    ldconfig_command="$candidate"\
+    break\
+  fi\
+done\
+if [[ -z "$ldconfig_command" ]] && command -v ldconfig >\/dev\/null; then\
+  ldconfig_command=$(command -v ldconfig)\
+fi\
+if [[ -n "$ldconfig_command" ]]; then\
+  host_systemd=$("$ldconfig_command" -p 2>\/dev\/null | awk '\''$1 == "libsystemd.so.0" && $2 ~ /x86-64/ { print $NF; exit }'\'')\
   if [[ -n "$host_systemd" && -f "$host_systemd" ]]; then\
     export LD_PRELOAD="$host_systemd${LD_PRELOAD:+:$LD_PRELOAD}"\
   fi\

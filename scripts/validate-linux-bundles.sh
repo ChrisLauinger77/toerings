@@ -41,7 +41,8 @@ test -f "$deb_check/usr/share/icons/hicolor/256x256/apps/ToeRings.png"
   test -f squashfs-root/usr/lib/libsystemd.so.0
   app_run=squashfs-root/AppRun
   bash -n "$app_run"
-  grep -F 'host_systemd=$(ldconfig -p 2>/dev/null' "$app_run"
+  grep -F 'for candidate in /usr/sbin/ldconfig /sbin/ldconfig; do' "$app_run"
+  grep -F 'host_systemd=$("$ldconfig_command" -p 2>/dev/null' "$app_run"
   grep -F 'export LD_PRELOAD="$host_systemd${LD_PRELOAD:+:$LD_PRELOAD}"' "$app_run"
   gtk_hook=squashfs-root/apprun-hooks/linuxdeploy-plugin-gtk.sh
   grep -Fx 'export WEBKIT_DISABLE_COMPOSITING_MODE=1' "$gtk_hook"
