@@ -7,6 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "clean": "node scripts/clean.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
