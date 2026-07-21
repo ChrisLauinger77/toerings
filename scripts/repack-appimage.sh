@@ -36,6 +36,7 @@ dd if="$appimage_path" of="$runtime_path" bs=1 count="$runtime_size" status=none
 )
 
 library_dir="$work_dir/squashfs-root/usr/lib"
+app_run="$work_dir/squashfs-root/AppRun"
 gtk_hook="$work_dir/squashfs-root/apprun-hooks/linuxdeploy-plugin-gtk.sh"
 excluded_libraries=(
   "libblkid.so.1"
@@ -61,10 +62,37 @@ for library in "${excluded_libraries[@]}"; do
   find "$library_dir" -maxdepth 1 \( -name "$library" -o -name "$library.*" \) -delete
 done
 
+if [[ ! -f "$app_run" ]]; then
+  echo "AppRun launcher not found: $app_run" >&2
+  exit 2
+fi
+
 if [[ ! -f "$gtk_hook" ]]; then
   echo "GTK AppRun hook not found: $gtk_hook" >&2
   exit 2
 fi
+
+# Prefer a host libsystemd when one is installed. The bundled copy remains a
+# fallback for distributions without libsystemd, but may require a newer glibc
+# than an older host provides when it comes from the AppImage build system.
+sed -i '/^source "\$this_dir"\/apprun-hooks\/"linuxdeploy-plugin-gtk.sh"$/i\
+ldconfig_command=""\
+for candidate in /usr/sbin/ldconfig /sbin/ldconfig; do\
+  if [[ -x "$candidate" ]]; then\
+    ldconfig_command="$candidate"\
+    break\
+  fi\
+done\
+if [[ -z "$ldconfig_command" ]] && command -v ldconfig >\/dev\/null; then\
+  ldconfig_command=$(command -v ldconfig)\
+fi\
+if [[ -n "$ldconfig_command" ]]; then\
+  host_systemd=$("$ldconfig_command" -p 2>\/dev\/null | awk '\''$1 == "libsystemd.so.0" && $2 ~ /x86-64/ { print $NF; exit }'\'')\
+  if [[ -n "$host_systemd" && -f "$host_systemd" ]]; then\
+    export LD_PRELOAD="$host_systemd${LD_PRELOAD:+:$LD_PRELOAD}"\
+  fi\
+fi\
+' "$app_run"
 
 # linuxdeploy forces every AppImage through X11. On Wayland this sends the
 # native menu and the WebView through XWayland, where menu activation can leave
