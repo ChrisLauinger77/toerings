@@ -463,6 +463,27 @@
     font-size: 11px;
   }
 
+  select {
+    padding-right: 32px;
+    color-scheme: dark;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, #cbd5e1 50%),
+      linear-gradient(135deg, #cbd5e1 50%, transparent 50%);
+    background-position:
+      calc(100% - 15px) 50%,
+      calc(100% - 11px) 50%;
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
+    cursor: pointer;
+  }
+
+  select option {
+    color: #f1f5f9;
+    background-color: #101722;
+  }
+
   select:focus,
   input:focus,
   button:focus-visible {
