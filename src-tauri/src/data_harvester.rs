@@ -252,7 +252,7 @@ impl DataCollector {
         let current_instant = std::time::Instant::now();
 
         // CPU
-        #[cfg(not(target_os = "freebsd"))]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
             if let Ok(cpu_data) = cpu::get_cpu_data_list(
                 self.show_average_cpu,
@@ -264,7 +264,7 @@ impl DataCollector {
                 self.data.cpu = Some(cpu_data);
             }
         }
-        #[cfg(target_os = "freebsd")]
+        #[cfg(any(target_os = "windows", target_os = "freebsd"))]
         {
             if let Ok(cpu_data) = cpu::get_cpu_data_list(
                 &self.sys,
