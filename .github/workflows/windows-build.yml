@@ -50,7 +50,12 @@ jobs:
           Compress-Archive -LiteralPath $binaryPath -DestinationPath $archivePath
           $checksumPath = "$archivePath.sha256"
           $checksum = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash.ToLowerInvariant()
-          "$checksum  $([System.IO.Path]::GetFileName($archivePath))" | Set-Content $checksumPath
+          $checksumLine = "$checksum  $([System.IO.Path]::GetFileName($archivePath))`n"
+          [System.IO.File]::WriteAllText(
+            $checksumPath,
+            $checksumLine,
+            [System.Text.UTF8Encoding]::new($false)
+          )
           "path=$archivePath" >> $env:GITHUB_OUTPUT
           "checksum-path=$checksumPath" >> $env:GITHUB_OUTPUT
       - name: "Upload Windows installer"
