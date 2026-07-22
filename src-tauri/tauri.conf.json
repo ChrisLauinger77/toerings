@@ -13,6 +13,7 @@
     "targets": "all",
     "externalBin": [],
     "icon": [
+      "icons/icon.ico",
       "icons/logo-256x256.png",
       "icons/logo-400x400.png"
     ],
