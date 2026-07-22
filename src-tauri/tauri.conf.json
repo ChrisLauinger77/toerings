@@ -13,6 +13,7 @@
     "targets": "all",
     "externalBin": [],
     "icon": [
+      "icons/icon.ico",
       "icons/logo-256x256.png",
       "icons/logo-400x400.png"
     ],
@@ -55,7 +56,7 @@
         "width": 325,
         "x": 30,
         "y": 50,
-        "resizable": true,
+        "resizable": false,
         "title": "toerings",
         "decorations": false,
         "transparent": true,

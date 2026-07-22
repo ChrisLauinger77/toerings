@@ -16,7 +16,7 @@ use starship_battery::{Battery, Manager};
 
 use sysinfo::System;
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 use sysinfo::Components;
 #[cfg(any(target_os = "windows", target_os = "freebsd"))]
 use sysinfo::Networks;
@@ -121,7 +121,7 @@ pub struct DataCollector {
     pub data: Data,
     #[cfg(not(target_os = "linux"))]
     sys: System,
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     components: Components,
     #[cfg(any(target_os = "windows", target_os = "freebsd"))]
     networks: Networks,
@@ -157,7 +157,7 @@ impl DataCollector {
                 sysinfo::RefreshKind::nothing()
                     .with_cpu(sysinfo::CpuRefreshKind::everything()),
             ),
-            #[cfg(not(target_os = "linux"))]
+            #[cfg(not(any(target_os = "linux", target_os = "windows")))]
             components: Components::new_with_refreshed_list(),
             #[cfg(any(target_os = "windows", target_os = "freebsd"))]
             networks: Networks::new_with_refreshed_list(),
@@ -236,6 +236,7 @@ impl DataCollector {
                 true,
                 sysinfo::ProcessRefreshKind::everything(),
             );
+            #[cfg(not(target_os = "windows"))]
             self.components.refresh(true);
 
             #[cfg(any(target_os = "windows", target_os = "freebsd"))]
@@ -252,7 +253,7 @@ impl DataCollector {
         let current_instant = std::time::Instant::now();
 
         // CPU
-        #[cfg(not(target_os = "freebsd"))]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
             if let Ok(cpu_data) = cpu::get_cpu_data_list(
                 self.show_average_cpu,
@@ -264,7 +265,7 @@ impl DataCollector {
                 self.data.cpu = Some(cpu_data);
             }
         }
-        #[cfg(target_os = "freebsd")]
+        #[cfg(any(target_os = "windows", target_os = "freebsd"))]
         {
             if let Ok(cpu_data) = cpu::get_cpu_data_list(
                 &self.sys,
@@ -355,11 +356,16 @@ impl DataCollector {
             self.data.list_of_processes = Some(process_list);
         }
 
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
         {
             if let Ok(data) = temperature::get_temperature_data(&self.components) {
                 self.data.temperature_sensors = data;
             }
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            self.data.temperature_sensors = Some(Vec::new());
         }
 
         #[cfg(target_os = "linux")]

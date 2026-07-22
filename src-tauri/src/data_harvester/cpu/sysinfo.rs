@@ -1,5 +1,5 @@
 //! CPU stats through sysinfo.
-//! Supports FreeBSD.
+//! Supports Windows and FreeBSD.
 
 use std::collections::VecDeque;
 

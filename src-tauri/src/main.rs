@@ -10,10 +10,9 @@ use std::sync::Mutex;
 
 use crate::utils::error;
 use data_harvester::{Data, DataCollector};
-use tauri::{
-    menu::{AboutMetadata, Menu, MenuItemBuilder, PredefinedMenuItem, Submenu},
-    Emitter, Manager,
-};
+#[cfg(not(target_os = "windows"))]
+use tauri::menu::{AboutMetadata, Menu, MenuItemBuilder, PredefinedMenuItem, Submenu};
+use tauri::{Emitter, Manager};
 
 #[cfg(target_family = "windows")]
 pub type Pid = usize;
@@ -27,6 +26,7 @@ fn collect_data(data_state: tauri::State<Mutex<DataCollector>>) -> Data {
     data_state.lock().unwrap().data.clone()
 }
 
+#[cfg(not(target_os = "windows"))]
 struct MenuLabels {
     open_preferences: &'static str,
     select_all: &'static str,
@@ -39,6 +39,7 @@ struct MenuLabels {
     upstream: &'static str,
 }
 
+#[cfg(not(target_os = "windows"))]
 fn menu_labels(locale: &str) -> MenuLabels {
     match locale {
         "de" => MenuLabels {
@@ -88,6 +89,7 @@ fn menu_labels(locale: &str) -> MenuLabels {
     }
 }
 
+#[cfg(not(target_os = "windows"))]
 fn build_menu<R: tauri::Runtime>(
     handle: &tauri::AppHandle<R>,
     locale: &str,
@@ -134,6 +136,7 @@ fn build_menu<R: tauri::Runtime>(
 }
 
 #[tauri::command]
+#[cfg(not(target_os = "windows"))]
 fn set_menu_locale(app: tauri::AppHandle, locale: String) -> Result<(), String> {
     let menu = build_menu(&app, &locale).map_err(|error| error.to_string())?;
     app.set_menu(menu)
@@ -141,13 +144,22 @@ fn set_menu_locale(app: tauri::AppHandle, locale: String) -> Result<(), String> 
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+#[cfg(target_os = "windows")]
+fn set_menu_locale(_app: tauri::AppHandle, _locale: String) -> Result<(), String> {
+    Ok(())
+}
+
 fn main() {
     let mut data_state = DataCollector::new();
     data_state.init();
 
-    tauri::Builder::default()
-        .manage(Mutex::new(data_state))
-        .menu(|handle| build_menu(handle, "en"))
+    let builder = tauri::Builder::default().manage(Mutex::new(data_state));
+
+    #[cfg(not(target_os = "windows"))]
+    let builder = builder.menu(|handle| build_menu(handle, "en"));
+
+    builder
         .on_menu_event(|app, event| match event.id().as_ref() {
             "preferences" => {
                 if let Some(window) = app.get_webview_window("main") {

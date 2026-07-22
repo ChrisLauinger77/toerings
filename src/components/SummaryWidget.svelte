@@ -1,12 +1,23 @@
 <script lang="ts">
   export let summaryData: SummaryData
+  export let onOpenPreferences: () => void
 
   import { t } from "../lib/i18n"
 </script>
 
-<header data-tauri-drag-region>
-  <h1>{$t("summary.system")}</h1>
-  <div class="divider"></div>
+<header>
+  <h1 data-tauri-drag-region>{$t("summary.system")}</h1>
+  <div class="divider" data-tauri-drag-region></div>
+  <button
+    type="button"
+    on:click={onOpenPreferences}
+    aria-label={$t("preferences.open")}
+    title={$t("preferences.open")}
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 7h7M15 7h5M11 4v6M4 17h3M11 17h9M7 14v6" />
+    </svg>
+  </button>
 </header>
 
 <ul>
@@ -36,6 +47,40 @@
     border-top: 1px solid var(--foregroundColor);
     height: 0;
     align-self: center;
+  }
+
+  button {
+    display: grid;
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    place-items: center;
+    margin-left: 5px;
+    padding: 0;
+    color: var(--foregroundColor);
+    background: rgb(255 255 255 / 8%);
+    border: 1px solid rgb(255 255 255 / 18%);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  button:hover,
+  button:focus-visible {
+    color: var(--accentColor);
+    background: rgb(255 255 255 / 14%);
+  }
+
+  button:focus-visible {
+    outline: 1px solid currentColor;
+    outline-offset: 1px;
+  }
+
+  svg {
+    width: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.8;
   }
 
   ul {
