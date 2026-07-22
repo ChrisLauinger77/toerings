@@ -26,7 +26,7 @@ jobs:
             artifact-name: "toerings-macos-universal"
           - platform: "windows-latest"
             rust-targets: "x86_64-pc-windows-msvc"
-            tauri-args: "--target x86_64-pc-windows-msvc --bundles nsis"
+            tauri-args: "--target x86_64-pc-windows-msvc --bundles nsis --features windows-console"
             artifact-name: "toerings-windows-x86_64"
 
     runs-on: ${{ matrix.platform }}
@@ -51,6 +51,26 @@ jobs:
         id: tauri
         with:
           args: ${{ matrix.tauri-args }}
+      - name: "smoke-test Windows startup"
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $binaryPath = "src-tauri/target/x86_64-pc-windows-msvc/release/ToeRings.exe"
+          $stdoutPath = Join-Path $env:RUNNER_TEMP "toerings-stdout.log"
+          $stderrPath = Join-Path $env:RUNNER_TEMP "toerings-stderr.log"
+          $process = Start-Process `
+            -FilePath $binaryPath `
+            -PassThru `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath
+          Start-Sleep -Seconds 10
+          if ($process.HasExited) {
+            Write-Host "ToeRings exited with code $($process.ExitCode)"
+            if (Test-Path -LiteralPath $stdoutPath) { Get-Content -LiteralPath $stdoutPath }
+            if (Test-Path -LiteralPath $stderrPath) { Get-Content -LiteralPath $stderrPath }
+            throw "ToeRings did not remain running during the startup smoke test"
+          }
+          Stop-Process -Id $process.Id -Force
       - name: repack AppImage without host infrastructure libraries
         if: matrix.platform == 'ubuntu-22.04'
         env:

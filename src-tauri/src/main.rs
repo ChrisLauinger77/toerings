@@ -1,5 +1,9 @@
 #![cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
+    all(
+        not(debug_assertions),
+        target_os = "windows",
+        not(feature = "windows-console")
+    ),
     windows_subsystem = "windows"
 )]
 

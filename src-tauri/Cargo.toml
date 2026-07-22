@@ -70,3 +70,4 @@ default = ["custom-protocol", "fern", "log"]
 # this feature is used for production builds where `frontendDist` points to the filesystem
 # DO NOT remove this
 custom-protocol = ["tauri/custom-protocol"]
+windows-console = []
