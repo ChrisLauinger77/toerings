@@ -26,7 +26,7 @@ jobs:
             artifact-name: "toerings-macos-universal"
           - platform: "windows-latest"
             rust-targets: "x86_64-pc-windows-msvc"
-            tauri-args: "--target x86_64-pc-windows-msvc --bundles nsis --features windows-console"
+            tauri-args: "--target x86_64-pc-windows-msvc --bundles nsis"
             artifact-name: "toerings-windows-x86_64"
 
     runs-on: ${{ matrix.platform }}
