@@ -37,6 +37,18 @@ chmod +x ToeRings_*_amd64.AppImage
 ./ToeRings_*_amd64.AppImage
 ```
 
+## Install on Windows
+
+Install ToeRings with [Scoop](https://scoop.sh/) from the
+[ChrisLauinger77 bucket](https://github.com/ChrisLauinger77/scoop-bucket):
+
+```powershell
+scoop bucket add ChrisLauinger77 https://github.com/ChrisLauinger77/scoop-bucket
+scoop install ChrisLauinger77/toerings
+```
+
+Alternatively, download the NSIS installer or portable ZIP from the GitHub release assets.
+
 ## Install on macOS
 
 Install ToeRings with [Homebrew](https://brew.sh/):
