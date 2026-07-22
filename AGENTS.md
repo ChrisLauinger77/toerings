@@ -2,7 +2,7 @@
 
 ## Project overview
 
-ToeRings is a desktop system monitor built with Tauri 2. The frontend uses Svelte 3,
+ToeRings is a desktop system monitor built with Tauri 2. The frontend uses Svelte 5,
 TypeScript, and Vite. The Rust backend gathers system information and exposes it to the
 frontend through a Tauri command.
 
