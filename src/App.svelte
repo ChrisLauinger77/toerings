@@ -182,6 +182,12 @@
   $: resizeWindow(preferencesVisible)
 
   function onKeydown(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+      e.preventDefault()
+      preferencesVisible = true
+      return
+    }
+
     if (e.key === "Escape") {
       preferencesVisible = false
     }
@@ -290,7 +296,7 @@
 
 <div class:preferences-left={preferencesOnLeft} class="flex" use:styleVars={cssVars}>
   <main>
-    <SummaryWidget {summaryData} />
+    <SummaryWidget {summaryData} onOpenPreferences={() => (preferencesVisible = true)} />
     <CPUWidget {cpuData} {tempData} {processList} />
     <MemWidget {memData} {processList} />
     <DiskWidget {diskData} {ioData} {processList} />
@@ -304,6 +310,9 @@
 
 <style>
   .flex {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
     background-color: var(--backgroundColor);
     display: flex;
   }
@@ -314,6 +323,8 @@
 
   main {
     width: 325px;
+    height: 850px;
+    flex: 0 0 325px;
     padding: 10px;
     max-height: 850px;
     overflow-y: hidden;

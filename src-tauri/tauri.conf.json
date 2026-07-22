@@ -56,10 +56,9 @@
         "width": 325,
         "x": 30,
         "y": 50,
-        "resizable": true,
+        "resizable": false,
         "title": "toerings",
         "decorations": false,
-        "dragDropEnabled": false,
         "transparent": true,
         "useHttpsScheme": true
       }
