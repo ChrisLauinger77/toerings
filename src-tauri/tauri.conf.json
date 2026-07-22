@@ -59,6 +59,7 @@
         "resizable": true,
         "title": "toerings",
         "decorations": false,
+        "dragDropEnabled": false,
         "transparent": true,
         "useHttpsScheme": true
       }
