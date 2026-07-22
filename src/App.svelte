@@ -327,7 +327,7 @@
     flex: 0 0 325px;
     padding: 10px;
     max-height: 850px;
-    overflow-y: hidden;
+    overflow: hidden;
     font-family: var(--fontFamily);
     color: var(--foregroundColor);
   }
