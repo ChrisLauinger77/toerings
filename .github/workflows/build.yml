@@ -2,6 +2,15 @@ name: "build"
 
 on:
   pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE"
+      - "AGENTS.md"
+      - ".github/FUNDING.yml"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".gitignore"
+      - "src-tauri/.gitignore"
+      - "renovate.json"
   workflow_dispatch:
 
 jobs:
