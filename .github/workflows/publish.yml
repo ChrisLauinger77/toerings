@@ -28,6 +28,8 @@ jobs:
               body: [
                 "Download the bundle for your platform from the assets below.",
                 "",
+                "Windows releases include an NSIS installer and a portable ZIP for package managers such as Scoop. The Windows binaries are not code-signed, so Microsoft Defender SmartScreen may show a warning.",
+                "",
                 "macOS builds are ad-hoc signed but cannot be notarized without a paid Apple Developer Program membership. On first launch, Control-click ToeRings and choose Open. See the README for additional Gatekeeper instructions."
               ].join("\n"),
               draft: true,
@@ -56,6 +58,10 @@ jobs:
             rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
             tauri-args: "--target universal-apple-darwin --bundles app"
             archive-arch: "universal"
+          - platform: "windows-latest"
+            rust-targets: "x86_64-pc-windows-msvc"
+            tauri-args: "--target x86_64-pc-windows-msvc --bundles nsis"
+            archive-arch: ""
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -127,6 +133,59 @@ jobs:
           archive_path="$RUNNER_TEMP/ToeRings_${GITHUB_REF_NAME#v}_${{ matrix['archive-arch'] }}.app.zip"
           ditto -c -k --sequesterRsrc --keepParent "$app_path" "$archive_path"
           gh release upload "$GITHUB_REF_NAME" "$archive_path"
+      - name: "create portable Windows ZIP"
+        if: matrix.platform == 'windows-latest'
+        id: portable
+        shell: pwsh
+        run: |
+          $version = (Get-Content "package.json" | ConvertFrom-Json).version
+          $binaryPath = "src-tauri/target/x86_64-pc-windows-msvc/release/ToeRings.exe"
+          $archivePath = Join-Path $env:RUNNER_TEMP "ToeRings_${version}_windows_x86_64_portable.zip"
+          if (-not (Test-Path -LiteralPath $binaryPath)) {
+            throw "Windows executable not found: $binaryPath"
+          }
+          Compress-Archive -LiteralPath $binaryPath -DestinationPath $archivePath
+          $checksumPath = "$archivePath.sha256"
+          $checksum = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash.ToLowerInvariant()
+          $checksumLine = "$checksum  $([System.IO.Path]::GetFileName($archivePath))`n"
+          [System.IO.File]::WriteAllText(
+            $checksumPath,
+            $checksumLine,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+          "path=$archivePath" >> $env:GITHUB_OUTPUT
+          "checksum-path=$checksumPath" >> $env:GITHUB_OUTPUT
+      - name: "upload Windows release assets"
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+          PORTABLE_PATH: ${{ steps.portable.outputs.path }}
+          PORTABLE_CHECKSUM_PATH: ${{ steps.portable.outputs.checksum-path }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          $installerPaths = @(
+            $env:ARTIFACT_PATHS |
+              ConvertFrom-Json |
+              Where-Object { $_.EndsWith(".exe", [System.StringComparison]::OrdinalIgnoreCase) }
+          )
+          if ($installerPaths.Count -eq 0) {
+            throw "NSIS installer not found in Tauri artifact paths"
+          }
+          foreach ($installerPath in $installerPaths) {
+            $checksumPath = "$installerPath.sha256"
+            $checksum = (Get-FileHash -Algorithm SHA256 -LiteralPath $installerPath).Hash.ToLowerInvariant()
+            $checksumLine = "$checksum  $([System.IO.Path]::GetFileName($installerPath))`n"
+            [System.IO.File]::WriteAllText(
+              $checksumPath,
+              $checksumLine,
+              [System.Text.UTF8Encoding]::new($false)
+            )
+            gh release upload $env:GITHUB_REF_NAME $installerPath $checksumPath
+          }
+          gh release upload $env:GITHUB_REF_NAME $env:PORTABLE_PATH $env:PORTABLE_CHECKSUM_PATH
 
   publish-release:
     permissions:
