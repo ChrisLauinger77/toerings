@@ -24,6 +24,10 @@ jobs:
             rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
             tauri-args: "--target universal-apple-darwin --bundles app"
             artifact-name: "toerings-macos-universal"
+          - platform: "windows-latest"
+            rust-targets: "x86_64-pc-windows-msvc"
+            tauri-args: "--target x86_64-pc-windows-msvc --bundles nsis"
+            artifact-name: "toerings-windows-x86_64"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -73,16 +77,50 @@ jobs:
           app_path=$(jq -r '.[] | select(endswith(".app"))' <<< "$ARTIFACT_PATHS" | head -n 1)
           test -n "$app_path"
           codesign --verify --deep --strict --verbose=4 "$app_path"
+      - name: "create portable Windows ZIP"
+        if: matrix.platform == 'windows-latest'
+        id: portable
+        shell: pwsh
+        run: |
+          $version = (Get-Content "package.json" | ConvertFrom-Json).version
+          $binaryPath = "src-tauri/target/x86_64-pc-windows-msvc/release/ToeRings.exe"
+          $archivePath = Join-Path $env:RUNNER_TEMP "ToeRings_${version}_windows_x86_64_portable.zip"
+          if (-not (Test-Path -LiteralPath $binaryPath)) {
+            throw "Windows executable not found: $binaryPath"
+          }
+          Compress-Archive -LiteralPath $binaryPath -DestinationPath $archivePath
+          $checksumPath = "$archivePath.sha256"
+          $checksum = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash.ToLowerInvariant()
+          $checksumLine = "$checksum  $([System.IO.Path]::GetFileName($archivePath))`n"
+          [System.IO.File]::WriteAllText(
+            $checksumPath,
+            $checksumLine,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+          "path=$archivePath" >> $env:GITHUB_OUTPUT
+          "checksum-path=$checksumPath" >> $env:GITHUB_OUTPUT
       - name: collect artifact paths
         id: artifacts
         env:
           ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
         run: |
-          echo "paths<<EOF" >> "$GITHUB_OUTPUT"
-          jq -r ".[]" <<< "$ARTIFACT_PATHS" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          node -e '
+            const fs = require("fs")
+            const paths = JSON.parse(process.env.ARTIFACT_PATHS)
+            const output = `paths<<EOF\n${paths.join("\n")}\nEOF\n`
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, output)
+          '
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ matrix.artifact-name }}
           path: ${{ steps.artifacts.outputs.paths }}
+          if-no-files-found: error
+      - name: "upload portable Windows ZIP"
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: "toerings-windows-x86_64-portable"
+          path: |
+            ${{ steps.portable.outputs.path }}
+            ${{ steps.portable.outputs.checksum-path }}
           if-no-files-found: error
