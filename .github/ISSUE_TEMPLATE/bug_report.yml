@@ -1,0 +1,115 @@
+name: "Bug report"
+description: "Report a reproducible problem with ToeRings"
+title: "[Bug]: "
+labels:
+  - "bug"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve ToeRings. Please provide enough detail for the problem to be reproduced.
+
+  - type: input
+    id: version
+    attributes:
+      label: "ToeRings version"
+      description: "Which ToeRings version is affected?"
+      placeholder: "0.4.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: "Operating system"
+      description: "Select the operating system on which the problem occurs."
+      options:
+        - "Windows 11"
+        - "Windows 10"
+        - "macOS"
+        - "Linux"
+        - "Other"
+    validations:
+      required: true
+
+  - type: input
+    id: system-details
+    attributes:
+      label: "System details"
+      description: "Specify the OS version, distribution, desktop environment, and CPU architecture as applicable."
+      placeholder: "Windows 11 24H2, x64"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation-method
+    attributes:
+      label: "Installation method"
+      options:
+        - "WinGet"
+        - "Scoop"
+        - "Windows installer"
+        - "Portable ZIP"
+        - "Linux package"
+        - "AppImage"
+        - "Homebrew"
+        - "GitHub release asset"
+        - "Built from source"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Steps to reproduce"
+      description: "List the smallest reliable sequence that triggers the problem."
+      placeholder: |
+        1. Start ToeRings
+        2. Open ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: "Actual behavior"
+      description: "What happened? Include the complete error message if one was shown."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: "Expected behavior"
+      description: "What did you expect to happen instead?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Relevant log output"
+      description: "Paste relevant logs after removing passwords, tokens, personal data, and other secrets."
+      render: "text"
+
+  - type: upload
+    id: screenshots
+    attributes:
+      label: "Screenshots and files"
+      description: "Upload screenshots or other files that help explain the problem."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "Pre-submission checklist"
+      options:
+        - label: "I searched the existing open and closed issues for duplicates."
+          required: true
+        - label: "I tested with the latest available ToeRings release."
+          required: true
+        - label: "I removed passwords, tokens, personal data, and other secrets from this report."
+          required: true

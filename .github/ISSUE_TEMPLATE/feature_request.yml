@@ -1,0 +1,80 @@
+name: "Feature request"
+description: "Suggest an improvement or a new capability for ToeRings"
+title: "[Feature]: "
+labels:
+  - "enhancement"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Explain the use case before describing a solution.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem or use case"
+      description: "What problem would this feature solve, and who would benefit from it?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: "Proposed solution"
+      description: "Describe the behavior you would like ToeRings to provide."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: "Area"
+      description: "Which part of ToeRings would this feature affect?"
+      options:
+        - "System monitoring data"
+        - "User interface and themes"
+        - "Settings and configuration"
+        - "Performance and resource usage"
+        - "Installation and packaging"
+        - "Platform support"
+        - "Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: "Target platforms"
+      description: "Select every platform to which the request applies."
+      multiple: true
+      options:
+        - "All platforms"
+        - "Windows"
+        - "macOS"
+        - "Linux"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives considered"
+      description: "Describe any workarounds or alternative solutions you have considered."
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: "Additional context"
+      description: "Add mockups, examples, links, or other information that clarifies the request."
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "Pre-submission checklist"
+      options:
+        - label: "I searched the existing open and closed issues for similar requests."
+          required: true
+        - label: "This request describes one focused feature or improvement."
+          required: true
+        - label: "This is a feature request, not a bug report or support question."
+          required: true
