@@ -37,24 +37,6 @@ chmod +x ToeRings_*_amd64.AppImage
 ./ToeRings_*_amd64.AppImage
 ```
 
-## Install on Windows
-
-Install ToeRings with [WinGet](https://learn.microsoft.com/windows/package-manager/winget/):
-
-```powershell
-winget install --exact --id ChrisLauinger77.ToeRings
-```
-
-Alternatively, install ToeRings with [Scoop](https://scoop.sh/) from the
-[ChrisLauinger77 bucket](https://github.com/ChrisLauinger77/scoop-bucket):
-
-```powershell
-scoop bucket add ChrisLauinger77 https://github.com/ChrisLauinger77/scoop-bucket
-scoop install ChrisLauinger77/toerings
-```
-
-You can also download the NSIS installer or portable ZIP from the GitHub release assets.
-
 ## Install on macOS
 
 Install ToeRings with [Homebrew](https://brew.sh/):
@@ -80,6 +62,25 @@ attribute from a build you downloaded from this repository and trust:
 ```sh
 xattr -dr com.apple.quarantine "/Applications/ToeRings.app"
 ```
+
+## Install on Windows
+
+Install ToeRings with [WinGet](https://learn.microsoft.com/windows/package-manager/winget/):
+
+```powershell
+winget install --exact --id ChrisLauinger77.ToeRings
+```
+
+Alternatively, install ToeRings with [Scoop](https://scoop.sh/) from the
+[ChrisLauinger77 bucket](https://github.com/ChrisLauinger77/scoop-bucket):
+
+```powershell
+scoop bucket add ChrisLauinger77 https://github.com/ChrisLauinger77/scoop-bucket
+scoop install ChrisLauinger77/toerings
+```
+
+You can also download the NSIS installer or portable ZIP from the GitHub release assets.
+
 
 ## Install from Source
 
