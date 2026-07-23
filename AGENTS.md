@@ -100,9 +100,15 @@ canonical tag `vX.Y.Z`; for example, `create release 0.0.1` creates `v0.0.1`.
     macOS arm64, and macOS Universal bundles, and publishes the release only after all
     build jobs succeed.
 11. Monitor the publish workflow to completion and report the commit, tag, workflow URL,
-    release URL, and artifact status. If publishing fails after the tag is pushed, preserve
-    the tag and draft release, diagnose the failure, and do not delete or retarget the tag
-    without explicit user confirmation.
+    release URL, artifact status, and Homebrew cask pull request status. After the GitHub
+    release is published, `.github/workflows/publish.yml` dispatches an `update-cask` event
+    to [`ChrisLauinger77/homebrew-cask`](https://github.com/ChrisLauinger77/homebrew-cask).
+    The tap automation opens a pull request; the cask is updated only after that pull request
+    is merged. Verify that the dispatch succeeds and report the resulting pull request URL
+    and status. Do not modify the tap or merge its pull request unless the user explicitly
+    requests it. If publishing fails after the tag is pushed, preserve the tag and draft
+    release, diagnose the failure, and do not delete or retarget the tag without explicit
+    user confirmation.
 
 There is currently no changelog or release-notes file. Do not invent one during a routine
 version release unless the user asks for it.
