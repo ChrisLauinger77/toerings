@@ -208,6 +208,14 @@ jobs:
               draft: false,
               prerelease: false
             })
+
+  publish-homebrew:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    needs: publish-release
+
+    steps:
       - name: "request Homebrew cask update"
         env:
           HOMEBREW_CASK_DISPATCH_TOKEN: ${{ secrets.HOMEBREW_CASK_DISPATCH_TOKEN }}
@@ -219,3 +227,18 @@ jobs:
             --header "X-GitHub-Api-Version: 2022-11-28" \
             https://api.github.com/repos/ChrisLauinger77/homebrew-cask/dispatches \
             --data '{"event_type":"update-cask","client_payload":{"cask":"toerings"}}'
+
+  publish-winget:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    needs: publish-release
+
+    steps:
+      - name: "request WinGet manifest update"
+        uses: vedantmgoyal9/winget-releaser@4ffc7888bffd451b357355dc214d43bb9f23917e # v2
+        with:
+          identifier: "ChrisLauinger77.ToeRings"
+          release-tag: "${{ github.ref_name }}"
+          installers-regex: "^ToeRings_[0-9]+\\.[0-9]+\\.[0-9]+_x64-setup\\.exe$"
+          token: "${{ secrets.WINGET_TOKEN }}"

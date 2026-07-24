@@ -2,7 +2,7 @@
 
 ## Project overview
 
-ToeRings is a desktop system monitor built with Tauri 2. The frontend uses Svelte 3,
+ToeRings is a desktop system monitor built with Tauri 2. The frontend uses Svelte 5,
 TypeScript, and Vite. The Rust backend gathers system information and exposes it to the
 frontend through a Tauri command.
 
@@ -10,8 +10,10 @@ frontend through a Tauri command.
 - `src/lib/stores.ts`: persisted color and font preferences.
 - `src-tauri/src/`: Rust application and system-data collectors.
 - `src-tauri/tauri.conf.json`: Tauri 2 application and bundle configuration.
-- `.github/workflows/build.yml`: pull-request and manually dispatched builds.
-- `.github/workflows/publish.yml`: tag-triggered release builds and publishing.
+- `.github/workflows/build.yml`: pull-request and manually dispatched builds for Linux,
+  macOS, and Windows.
+- `.github/workflows/publish.yml`: tag-triggered release builds, GitHub publishing, and
+  downstream package-manager updates.
 
 Keep framework and frontend upgrades separate from Tauri maintenance. Do not mix Svelte,
 Vite, or TypeScript modernization into Tauri migration or release changes.
@@ -40,8 +42,8 @@ Vite, or TypeScript modernization into Tauri migration or release changes.
 ## Git and GitHub workflow
 
 - Do feature work on a `codex/` branch unless the user specifies another branch.
-- Pull requests run `.github/workflows/build.yml` for Linux x86_64, macOS arm64, and macOS
-  Universal artifacts.
+- Pull requests run `.github/workflows/build.yml` for Linux x86_64, macOS arm64, macOS
+  Universal, and Windows x64 artifacts.
 - Do not push, tag, publish a release, or open a pull request unless the user requests it.
 - A direct request such as `create release 0.0.1` is explicit authorization for the full
   release procedure below: version edits, verification, commit, tag creation, and pushing
@@ -97,8 +99,11 @@ canonical tag `vX.Y.Z`; for example, `create release 0.0.1` creates `v0.0.1`.
 
 10. Push the release commit first, then push the exact tag to `origin`. The tag push starts
     `.github/workflows/publish.yml`, which creates a draft GitHub release, attaches Linux,
-    macOS arm64, and macOS Universal bundles, and publishes the release only after all
-    build jobs succeed.
+    macOS arm64, macOS Universal, Windows x64 NSIS, and Windows x64 portable bundles, and
+    publishes the release only after all build jobs succeed. After publication, independent
+    jobs request the Homebrew cask update and submit the versioned NSIS installer to WinGet.
+    WinGet publishing requires the `WINGET_TOKEN` repository secret and an existing package
+    version in the official WinGet community repository.
 11. Monitor the publish workflow to completion and report the commit, tag, workflow URL,
     release URL, artifact status, and Homebrew cask pull request status. After the GitHub
     release is published, `.github/workflows/publish.yml` dispatches an `update-cask` event
