@@ -27,9 +27,15 @@
     color: $foregroundColor
   }
 
-  $: avgDieTemp = mean(tempData.map(sensor => sensor.temperature))
+  $: temperatures = tempData
+    .map(sensor => sensor.temperature)
+    .filter(temperature => Number.isFinite(temperature))
+  $: avgDieTemp = temperatures.length > 0 ? mean(temperatures) : undefined
   $: attrs = [
-    { key: $t("cpu.temperature"), value: `${avgDieTemp.toFixed(1)}°C` },
+    {
+      key: $t("cpu.temperature"),
+      value: avgDieTemp === undefined ? $t("common.notAvailable") : `${avgDieTemp.toFixed(1)}°C`
+    },
     { key: $t("cpu.load"), value: (cpuData.cpuLoads.at(-1) ?? 0).toFixed(2) }
   ]
   $: cpuSortedProcesses = [...processList]
