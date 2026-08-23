@@ -239,6 +239,25 @@
   }
 
   let localIp: string | null = null
+  let externalIp: string | null = null
+
+  const externalIpRefreshMs = 10 * 60 * 1000
+
+  async function refreshExternalIp() {
+    try {
+      const detectedIp = await invoke<string | null>("get_external_ip")
+      if (detectedIp !== null) externalIp = detectedIp
+    } catch {
+      // Keep the last detected address when the lookup is unavailable.
+    }
+  }
+
+  onMount(() => {
+    refreshExternalIp()
+    const refreshTimer = window.setInterval(refreshExternalIp, externalIpRefreshMs)
+
+    return () => window.clearInterval(refreshTimer)
+  })
 
   let lastDataCollection = 0
 
@@ -300,7 +319,7 @@
     <CPUWidget {cpuData} {tempData} {processList} />
     <MemWidget {memData} {processList} />
     <DiskWidget {diskData} {ioData} {processList} />
-    <NetWidget {networkData} {localIp} hostname={summaryData.hostname} />
+    <NetWidget {networkData} {localIp} {externalIp} hostname={summaryData.hostname} />
   </main>
 
   {#if preferencesVisible}

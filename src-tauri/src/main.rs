@@ -6,7 +6,7 @@
 mod data_harvester;
 mod utils;
 
-use std::sync::Mutex;
+use std::{net::Ipv4Addr, sync::Mutex, time::Duration};
 
 use crate::utils::error;
 use data_harvester::{Data, DataCollector};
@@ -24,6 +24,32 @@ pub type Pid = libc::pid_t;
 fn collect_data(data_state: tauri::State<Mutex<DataCollector>>) -> Data {
     futures::executor::block_on(data_state.lock().unwrap().update_data());
     data_state.lock().unwrap().data.clone()
+}
+
+fn parse_external_ipv4(response: &str) -> Option<String> {
+    response
+        .trim()
+        .parse::<Ipv4Addr>()
+        .ok()
+        .map(|address| address.to_string())
+}
+
+#[tauri::command]
+async fn get_external_ip() -> Option<String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .ok()?;
+    let response = client
+        .get("https://api.ipify.org")
+        .send()
+        .await
+        .ok()?
+        .error_for_status()
+        .ok()?;
+    let body = response.text().await.ok()?;
+
+    parse_external_ipv4(&body)
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -176,7 +202,38 @@ fn main() {
             "quit" => app.exit(0),
             _ => {}
         })
-        .invoke_handler(tauri::generate_handler![collect_data, set_menu_locale])
+        .invoke_handler(tauri::generate_handler![
+            collect_data,
+            get_external_ip,
+            set_menu_locale
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_external_ipv4;
+
+    #[test]
+    fn parses_external_ipv4() {
+        assert_eq!(
+            parse_external_ipv4("203.0.113.42"),
+            Some("203.0.113.42".to_string())
+        );
+    }
+
+    #[test]
+    fn trims_external_ipv4_response() {
+        assert_eq!(
+            parse_external_ipv4("  198.51.100.8\n"),
+            Some("198.51.100.8".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_non_ipv4_responses() {
+        assert_eq!(parse_external_ipv4("2001:db8::1"), None);
+        assert_eq!(parse_external_ipv4("not an IP address"), None);
+    }
 }

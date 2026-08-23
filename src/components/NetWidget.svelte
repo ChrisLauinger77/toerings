@@ -1,6 +1,7 @@
 <script lang="ts">
   export let networkData: { rx: Array<number>; tx: Array<number> }
   export let localIp: string | null = null
+  export let externalIp: string | null = null
   export let hostname: string | null
 
   import { calcStrokeWidth, toMetric } from "../lib/utils"
@@ -12,7 +13,8 @@
 
   $: attrs = [
     { key: $t("network.hostname"), value: hostname ?? $t("common.notAvailable") },
-    { key: $t("network.localIp"), value: localIp ?? $t("common.notAvailable") }
+    { key: $t("network.localIp"), value: localIp ?? $t("common.notAvailable") },
+    { key: $t("network.externalIp"), value: externalIp ?? $t("common.notAvailable") }
   ]
 
   $: arcs = [
