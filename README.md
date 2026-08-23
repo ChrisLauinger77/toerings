@@ -100,6 +100,9 @@ There is a preferences panel which is accessible from the app menu.
 
 ![preferences panel](./public/example-preferences.png)
 
+ToeRings displays the public IPv4 address reported by `api.ipify.org`. It contacts that
+service when the app starts and every 10 minutes while the app is running.
+
 ## Run in Development
 
 ```sh
