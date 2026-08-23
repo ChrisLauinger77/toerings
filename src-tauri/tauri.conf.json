@@ -41,7 +41,7 @@
   },
   "productName": "ToeRings",
   "mainBinaryName": "ToeRings",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "identifier": "io.toerings",
   "plugins": {},
   "app": {
