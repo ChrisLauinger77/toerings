@@ -13,6 +13,7 @@ pub fn get_process_data<F>(
     use_current_cpu_total: bool,
     unnormalized_cpu: bool,
     mem_total_kb: u64,
+    elapsed: std::time::Duration,
     user_table: &mut UserTable,
     backup_cpu_proc_usage: F,
 ) -> Result<Vec<ProcessHarvest>>
@@ -104,8 +105,8 @@ where
             },
             mem_usage_bytes: process_val.memory(),
             cpu_usage_percent: process_cpu_usage,
-            read_bytes_per_sec: disk_usage.read_bytes,
-            write_bytes_per_sec: disk_usage.written_bytes,
+            read_bytes_per_sec: super::super::rates::bytes_per_second(disk_usage.read_bytes, elapsed),
+            write_bytes_per_sec: super::super::rates::bytes_per_second(disk_usage.written_bytes, elapsed),
             total_read_bytes: disk_usage.total_read_bytes,
             total_write_bytes: disk_usage.total_written_bytes,
             process_state,
@@ -127,13 +128,18 @@ where
         .filter(|process| process.process_state.0 == unknown_state)
         .map(|process| process.pid)
         .collect();
-    let cpu_usages = backup_cpu_proc_usage(&cpu_usage_unknown_pids)?;
+    let cpu_usages = if cpu_usage_unknown_pids.is_empty() {
+        HashMap::new()
+    } else {
+        // Keep valid primary data when optional fallback collection fails.
+        backup_cpu_proc_usage(&cpu_usage_unknown_pids).unwrap_or_default()
+    };
     for process in &mut process_vector {
-        if cpu_usages.contains_key(&process.pid) {
+        if let Some(&usage) = cpu_usages.get(&process.pid) {
             process.cpu_usage_percent = if unnormalized_cpu || num_processors == 0.0 {
-                *cpu_usages.get(&process.pid).unwrap()
+                usage
             } else {
-                *cpu_usages.get(&process.pid).unwrap() / num_processors
+                usage / num_processors
             };
         }
     }

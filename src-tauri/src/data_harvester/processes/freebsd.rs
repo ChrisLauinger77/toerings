@@ -29,6 +29,7 @@ pub fn get_process_data(
     use_current_cpu_total: bool,
     unnormalized_cpu: bool,
     mem_total_kb: u64,
+    elapsed: std::time::Duration,
     user_table: &mut UserTable,
 ) -> crate::utils::error::Result<Vec<ProcessHarvest>> {
     super::macos_freebsd::get_process_data(
@@ -36,6 +37,7 @@ pub fn get_process_data(
         use_current_cpu_total,
         unnormalized_cpu,
         mem_total_kb,
+        elapsed,
         user_table,
         get_freebsd_process_cpu_usage,
     )

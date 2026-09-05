@@ -2,6 +2,8 @@
 
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::time::Instant;
+use crate::data_harvester::rates::bytes_per_second;
 
 use fxhash::{FxHashMap, FxHashSet};
 use procfs::process::{Process, Stat};
@@ -19,34 +21,29 @@ const MAX_STAT_NAME_LEN: usize = 15;
 
 #[derive(Debug, Clone, Default)]
 pub struct PrevProcDetails {
-    total_read_bytes: u64,
-    total_write_bytes: u64,
+    start_time: Option<u64>,
     cpu_time: u64,
+    io: Option<(u64, u64, Instant)>,
 }
 
-fn calculate_idle_values(line: &str) -> Point {
-    /// Converts a `Option<&str>` value to an f64. If it fails to parse or is `None`, then it will return `0_f64`.
-    fn str_to_f64(val: Option<&str>) -> f64 {
-        val.and_then(|v| v.parse::<f64>().ok()).unwrap_or(0_f64)
+impl PrevProcDetails {
+    fn for_start_time(&self, start_time: u64) -> Option<&Self> {
+        (self.start_time == Some(start_time)).then_some(self)
     }
+}
 
-    let mut val = line.split_whitespace();
-    let user = str_to_f64(val.next());
-    let nice: f64 = str_to_f64(val.next());
-    let system: f64 = str_to_f64(val.next());
-    let idle: f64 = str_to_f64(val.next());
-    let iowait: f64 = str_to_f64(val.next());
-    let irq: f64 = str_to_f64(val.next());
-    let softirq: f64 = str_to_f64(val.next());
-    let steal: f64 = str_to_f64(val.next());
-
-    // Note we do not get guest/guest_nice, as they are calculated as part of user/nice respectively
-    // See https://github.com/htop-dev/htop/blob/main/linux/LinuxProcessList.c
-
-    let idle = idle + iowait;
-    let non_idle = user + nice + system + irq + softirq + steal;
-
-    (idle, non_idle)
+fn calculate_idle_values(line: &str) -> error::Result<Point> {
+    let mut values = line.split_whitespace();
+    if values.next() != Some("cpu") {
+        return Err(ToeError::QueryError("Missing aggregate CPU label".into()));
+    }
+    let counters = values.take(8).map(str::parse::<u64>).collect::<Result<Vec<_>, _>>()?;
+    if counters.len() < 4 {
+        return Err(ToeError::QueryError("Incomplete CPU counters".into()));
+    }
+    let get = |index| counters.get(index).copied().unwrap_or(0) as f64;
+    // Guest time is already included in user/nice; steal must remain in the total.
+    Ok((get(3) + get(4), get(0) + get(1) + get(2) + get(5) + get(6) + get(7)))
 }
 
 struct CpuUsage {
@@ -64,7 +61,7 @@ fn cpu_usage_calculation(prev_idle: &mut f64, prev_non_idle: &mut f64) -> error:
         let mut first_line = String::new();
         reader.read_line(&mut first_line)?;
 
-        calculate_idle_values(&first_line)
+        calculate_idle_values(&first_line)?
     };
 
     let total = idle + non_idle;
@@ -102,14 +99,14 @@ fn get_linux_cpu_usage(
     stat: &Stat,
     cpu_usage: f64,
     cpu_fraction: f64,
-    prev_proc_times: u64,
+    prev_proc_times: Option<u64>,
     use_current_cpu_total: bool,
 ) -> (f64, u64) {
     // Based heavily on https://stackoverflow.com/a/23376195 and https://stackoverflow.com/a/1424556
-    let new_proc_times = stat.utime + stat.stime;
-    let diff = (new_proc_times - prev_proc_times) as f64; // No try_from for u64 -> f64... oh well.
+    let new_proc_times = stat.utime.saturating_add(stat.stime);
+    let diff = counter_delta(new_proc_times, prev_proc_times) as f64;
 
-    if cpu_usage == 0.0 {
+    if cpu_usage <= 0.0 || !cpu_usage.is_finite() || !cpu_fraction.is_finite() {
         (0.0, new_proc_times)
     } else if use_current_cpu_total {
         ((diff / cpu_usage) * 100.0, new_proc_times)
@@ -124,10 +121,10 @@ fn read_proc(
     cpu_usage: f64,
     cpu_fraction: f64,
     use_current_cpu_total: bool,
-    time_difference_in_secs: u64,
+    now: Instant,
     mem_total_kb: u64,
     user_table: &mut UserTable,
-) -> error::Result<(ProcessHarvest, u64)> {
+) -> error::Result<(ProcessHarvest, PrevProcDetails)> {
     let stat = process.stat()?;
     let (command, name) = {
         let truncated_name = stat.comm.as_str();
@@ -168,7 +165,7 @@ fn read_proc(
         &stat,
         cpu_usage,
         cpu_fraction,
-        prev_proc.cpu_time,
+        prev_proc.for_start_time(stat.starttime).map(|previous| previous.cpu_time),
         use_current_cpu_total,
     );
     let parent_pid = Some(stat.ppid);
@@ -176,33 +173,12 @@ fn read_proc(
     let mem_usage_kb = mem_usage_bytes / 1024;
     let mem_usage_percent = mem_usage_kb as f64 / mem_total_kb as f64 * 100.0;
 
-    // This can fail if permission is denied!
-    let (total_read_bytes, total_write_bytes, read_bytes_per_sec, write_bytes_per_sec) =
-        if let Ok(io) = process.io() {
-            let total_read_bytes = io.read_bytes;
-            let total_write_bytes = io.write_bytes;
-            let prev_total_read_bytes = prev_proc.total_read_bytes;
-            let prev_total_write_bytes = prev_proc.total_write_bytes;
-
-            let read_bytes_per_sec = total_read_bytes
-                .saturating_sub(prev_total_read_bytes)
-                .checked_div(time_difference_in_secs)
-                .unwrap_or(0);
-
-            let write_bytes_per_sec = total_write_bytes
-                .saturating_sub(prev_total_write_bytes)
-                .checked_div(time_difference_in_secs)
-                .unwrap_or(0);
-
-            (
-                total_read_bytes,
-                total_write_bytes,
-                read_bytes_per_sec,
-                write_bytes_per_sec,
-            )
-        } else {
-            (0, 0, 0, 0)
-        };
+    // A missing I/O reading invalidates only that baseline. Reappearing counters
+    // must not attribute the process's lifetime traffic to one sampling interval.
+    let io = process.io().ok().map(|io| (io.read_bytes, io.write_bytes, now));
+    let previous_io = prev_proc.for_start_time(stat.starttime).and_then(|previous| previous.io);
+    let (read_bytes_per_sec, write_bytes_per_sec) = io_rates(io, previous_io);
+    let (total_read_bytes, total_write_bytes) = io.map(|(read, write, _)| (read, write)).unwrap_or((0, 0));
 
     let uid = process.uid()?;
 
@@ -226,7 +202,7 @@ fn read_proc(
                 .map(Into::into)
                 .unwrap_or_else(|_| "N/A".into()),
         },
-        new_process_times,
+        PrevProcDetails { start_time: Some(stat.starttime), cpu_time: new_process_times, io },
     ))
 }
 
@@ -249,16 +225,18 @@ pub fn get_process_data(
     pid_mapping: &mut FxHashMap<Pid, PrevProcDetails>,
     use_current_cpu_total: bool,
     normalization: CpuUsageStrategy,
-    time_difference_in_secs: u64,
+    now: Instant,
     mem_total_kb: u64,
     user_table: &mut UserTable,
 ) -> crate::utils::error::Result<Vec<ProcessHarvest>> {
-    // TODO: [PROC THREADS] Add threads
+    // Commit aggregate CPU baselines only after a successful process enumeration.
+    let mut next_idle = *prev_idle;
+    let mut next_non_idle = *prev_non_idle;
 
     if let Ok(CpuUsage {
         mut cpu_usage,
         cpu_fraction,
-    }) = cpu_usage_calculation(prev_idle, prev_non_idle)
+    }) = cpu_usage_calculation(&mut next_idle, &mut next_non_idle)
     {
         if let CpuUsageStrategy::NonNormalized(num_cores) = normalization {
             // Note we *divide* here because the later calculation divides `cpu_usage` - in effect,
@@ -277,19 +255,17 @@ pub fn get_process_data(
                         };
                         let prev_proc_details = pid_mapping.entry(pid).or_default();
 
-                        if let Ok((process_harvest, new_process_times)) = read_proc(
+                        if let Ok((process_harvest, new_details)) = read_proc(
                             prev_proc_details,
                             &process,
                             cpu_usage,
                             cpu_fraction,
                             use_current_cpu_total,
-                            time_difference_in_secs,
+                            now,
                             mem_total_kb,
                             user_table,
                         ) {
-                            prev_proc_details.cpu_time = new_process_times;
-                            prev_proc_details.total_read_bytes = process_harvest.total_read_bytes;
-                            prev_proc_details.total_write_bytes = process_harvest.total_write_bytes;
+                            *prev_proc_details = new_details;
 
                             pids_to_clear.remove(&pid);
                             return Some(process_harvest);
@@ -305,6 +281,8 @@ pub fn get_process_data(
             pid_mapping.remove(pid);
         });
 
+        *prev_idle = next_idle;
+        *prev_non_idle = next_non_idle;
         Ok(process_vector)
     } else {
         Err(ToeError::GenericError(
@@ -313,46 +291,56 @@ pub fn get_process_data(
     }
 }
 
+fn counter_delta(current: u64, previous: Option<u64>) -> u64 {
+    previous.and_then(|previous| current.checked_sub(previous)).unwrap_or(0)
+}
+
+fn io_rates(current: Option<(u64, u64, Instant)>, previous: Option<(u64, u64, Instant)>) -> (u64, u64) {
+    match (current, previous) {
+        (Some((read, write, now)), Some((old_read, old_write, then))) => {
+            let elapsed = now.saturating_duration_since(then);
+            (bytes_per_second(counter_delta(read, Some(old_read)), elapsed),
+             bytes_per_second(counter_delta(write, Some(old_write)), elapsed))
+        }
+        _ => (0, 0),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
-    fn test_proc_cpu_parse() {
-        assert_eq!(
-            (100_f64, 200_f64),
-            calculate_idle_values("100 0 100 100"),
-            "Failed to properly calculate idle/non-idle for /proc/stat CPU with 4 values"
-        );
-        assert_eq!(
-            (120_f64, 200_f64),
-            calculate_idle_values("100 0 100 100 20"),
-            "Failed to properly calculate idle/non-idle for /proc/stat CPU with 5 values"
-        );
-        assert_eq!(
-            (120_f64, 230_f64),
-            calculate_idle_values("100 0 100 100 20 30"),
-            "Failed to properly calculate idle/non-idle for /proc/stat CPU with 6 values"
-        );
-        assert_eq!(
-            (120_f64, 270_f64),
-            calculate_idle_values("100 0 100 100 20 30 40"),
-            "Failed to properly calculate idle/non-idle for /proc/stat CPU with 7 values"
-        );
-        assert_eq!(
-            (120_f64, 320_f64),
-            calculate_idle_values("100 0 100 100 20 30 40 50"),
-            "Failed to properly calculate idle/non-idle for /proc/stat CPU with 8 values"
-        );
-        assert_eq!(
-            (120_f64, 320_f64),
-            calculate_idle_values("100 0 100 100 20 30 40 50 100"),
-            "Failed to properly calculate idle/non-idle for /proc/stat CPU with 9 values"
-        );
-        assert_eq!(
-            (120_f64, 320_f64),
-            calculate_idle_values("100 0 100 100 20 30 40 50 100 200"),
-            "Failed to properly calculate idle/non-idle for /proc/stat CPU with 10 values"
-        );
+    fn parses_actual_proc_stat_lines_including_steal() {
+        assert_eq!(calculate_idle_values("cpu 100 0 100 100").unwrap(), (100.0, 200.0));
+        assert_eq!(calculate_idle_values("cpu 100 0 100 100 20 30 40 50 100 200").unwrap(), (120.0, 320.0));
+        assert!(calculate_idle_values("100 0 100 100").is_err());
+        assert!(calculate_idle_values("cpu 100 0").is_err());
+        assert!(calculate_idle_values("cpu 100 invalid 100 100").is_err());
+    }
+
+    #[test]
+    fn pid_reuse_and_counter_reset_rebaseline_without_underflow() {
+        let previous = PrevProcDetails {
+            start_time: Some(100),
+            cpu_time: 1000,
+            io: Some((1000, 2000, Instant::now())),
+        };
+        assert!(previous.for_start_time(200).is_none());
+        assert_eq!(previous.for_start_time(100).unwrap().cpu_time, 1000);
+        assert_eq!(counter_delta(2, Some(1000)), 0);
+        assert_eq!(counter_delta(90000, None), 0);
+        assert_eq!(counter_delta(1100, Some(1000)), 100);
+    }
+
+    #[test]
+    fn io_uses_its_own_fractional_interval_and_requires_a_baseline() {
+        let now = Instant::now();
+        let current = Some((2900, 4800, now + Duration::from_millis(1900)));
+        assert_eq!(io_rates(current, Some((1000, 1000, now))), (1000, 2000));
+        assert_eq!(io_rates(current, None), (0, 0));
+        assert_eq!(io_rates(None, Some((1000, 1000, now))), (0, 0));
+        assert_eq!(io_rates(Some((10, 20, now + Duration::from_secs(1))), Some((1000, 1000, now))), (0, 0));
     }
 }

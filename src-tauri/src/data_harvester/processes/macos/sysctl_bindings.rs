@@ -285,8 +285,9 @@ pub(crate) fn kinfo_process(pid: Pid) -> Result<kinfo_proc> {
         bail!("failed to get process for pid {pid}");
     }
 
-    // sysctl succeeds but size is zero, happens when process has gone away
-    if size == 0 {
+    // A successful sysctl may return zero bytes for an exited process. Never
+    // assume initialization unless the complete expected structure was written.
+    if size != mem::size_of::<kinfo_proc>() {
         bail!("failed to get process for pid {pid}");
     }
 
