@@ -66,7 +66,7 @@ export default [
       "prefer-arrow-callback": "error",
       "prefer-const": "off",
       "require-await": "error",
-      "svelte/no-at-html-tags": "off",
+      "svelte/no-at-html-tags": "error",
       "svelte/no-reactive-reassign": "off",
       "svelte/require-each-key": "off"
     }

@@ -10,7 +10,7 @@
     type PhysicalSize
   } from "@tauri-apps/api/window"
   import { listen } from "@tauri-apps/api/event"
-  import { sum, pick } from "lodash-es"
+  import { pick } from "lodash-es"
   import { onMount } from "svelte"
   import "uplot/dist/uPlot.min.css"
 
@@ -23,7 +23,10 @@
     accentColor,
     fontFamily
   } from "./lib/stores"
-  import { sleep, saturatedPush } from "./lib/utils"
+  import { saturatedPush } from "./lib/utils"
+  import { startPolling } from "./lib/polling"
+  import { normalizeData, collectionStatus } from "./lib/telemetry"
+  import { t } from "./lib/i18n"
   import SummaryWidget from "./components/SummaryWidget.svelte"
   import CPUWidget from "./components/CPUWidget.svelte"
   import MemWidget from "./components/MemWidget.svelte"
@@ -203,14 +206,14 @@
     os_version: null
   }
 
-  let cpuData: { perCoreUtil: Array<number>; cpuLoads: Array<number> } = {
+  let cpuData: { perCoreUtil: Array<number>; cpuLoads: Array<number | null> } = {
     perCoreUtil: [],
     cpuLoads: Array(60).fill(0)
   }
   let processList: Array<Process> = []
   let tempData: Array<TempData> = []
   let memData: {
-    ram: { usage: MemData; percentages: Array<number> }
+    ram: { usage: MemData; percentages: Array<number | null> }
     swap: { usage: MemData }
   } = {
     ram: {
@@ -231,9 +234,12 @@
   }
 
   let diskData: Array<DiskData> = []
-  let ioData = Array(60).fill({ read: 0, write: 0 })
+  let ioData: Array<{ read: number | null; write: number | null }> = Array(60).fill({
+    read: 0,
+    write: 0
+  })
 
-  let networkData = {
+  let networkData: { rx: Array<number | null>; tx: Array<number | null> } = {
     rx: Array(60).fill(0),
     tx: Array(60).fill(0)
   }
@@ -243,64 +249,59 @@
 
   const externalIpRefreshMs = 10 * 60 * 1000
 
-  async function refreshExternalIp() {
-    try {
-      const detectedIp = await invoke<string | null>("get_external_ip")
-      if (detectedIp !== null) externalIp = detectedIp
-    } catch {
-      // Keep the last detected address when the lookup is unavailable.
-    }
-  }
+  onMount(() =>
+    startPolling<string | null>({
+      collect: () => invoke<string | null>("get_external_ip"),
+      receive: detectedIp => {
+        if (detectedIp !== null) externalIp = detectedIp
+      },
+      failed: () => {}, // Keep the last detected address when the lookup is unavailable.
+      intervalMs: externalIpRefreshMs,
+      maxBackoffMs: externalIpRefreshMs
+    })
+  )
 
-  onMount(() => {
-    refreshExternalIp()
-    const refreshTimer = window.setInterval(refreshExternalIp, externalIpRefreshMs)
+  let status: "starting" | "stale" | "partial" | "ready" = "starting"
+  let lastSequence = 0
+  let memoryAvailable = false
+  let swapAvailable = false
 
-    return () => window.clearInterval(refreshTimer)
-  })
-
-  let lastDataCollection = 0
-
-  async function collectData() {
-    lastDataCollection = Date.now()
-    const data: Data = await invoke("collect_data")
-    processData(data)
-    const sleepMs = Math.max(lastDataCollection + 1000 - Date.now(), 0)
-    await sleep(sleepMs)
-    collectData()
-  }
+  onMount(() =>
+    startPolling<Data>({
+      collect: () => invoke<Data>("collect_data"),
+      receive: data => {
+        status = collectionStatus(data)
+        if (status === "stale" || status === "starting" || data.sequence === lastSequence) return
+        processData(data)
+        lastSequence = data.sequence
+      },
+      failed: () => {
+        status = "stale"
+      }
+    })
+  )
 
   function processData(data: Data) {
+    const sample = normalizeData(data)
     summaryData = pick(data, ["uptime", "hostname", "kernel_name", "kernel_version", "os_version"])
-    processList = data.list_of_processes
-
-    cpuData.perCoreUtil = data.cpu.map(cpu => cpu.cpu_usage)
-    saturatedPush(cpuData.cpuLoads, sum(cpuData.perCoreUtil) / 100, graphXLimit)
+    processList = sample.processes
+    cpuData.perCoreUtil = sample.cpu.map(cpu => cpu.cpu_usage)
+    saturatedPush(cpuData.cpuLoads, sample.cpuLoad, graphXLimit)
     cpuData = cpuData
-
-    tempData = data.temperature_sensors
-
-    memData.ram.usage = data.memory
-    saturatedPush(memData.ram.percentages, data.memory.use_percent, graphXLimit)
-    memData.swap.usage = data.swap
-
-    diskData = data.disks
-
-    const ioDataPoint = {
-      read: sum(data.list_of_processes.map(process => process.read_bytes_per_sec)),
-      write: sum(data.list_of_processes.map(process => process.write_bytes_per_sec))
-    }
-    saturatedPush(ioData, ioDataPoint, graphXLimit)
+    tempData = sample.temperatures
+    memData.ram.usage = sample.memory
+    saturatedPush(memData.ram.percentages, sample.memoryPercent, graphXLimit)
+    memData.swap.usage = sample.swap
+    memoryAvailable = sample.memoryAvailable
+    swapAvailable = sample.swapAvailable
+    diskData = sample.disks
+    saturatedPush(ioData, { read: sample.read, write: sample.write }, graphXLimit)
     ioData = ioData
-
-    saturatedPush(networkData.rx, data.network.rx, graphXLimit)
-    saturatedPush(networkData.tx, data.network.tx, graphXLimit)
+    saturatedPush(networkData.rx, sample.rx, graphXLimit)
+    saturatedPush(networkData.tx, sample.tx, graphXLimit)
     networkData = networkData
-
     localIp = data.local_ip
   }
-
-  collectData()
 
   $: cssVars = {
     foregroundColor: $foregroundColor.toHslString(),
@@ -316,8 +317,11 @@
 <div class:preferences-left={preferencesOnLeft} class="flex" use:styleVars={cssVars}>
   <main>
     <SummaryWidget {summaryData} onOpenPreferences={() => (preferencesVisible = true)} />
+    {#if status !== "ready"}
+      <p class="collection-status" role="status">{$t(`collection.${status}`)}</p>
+    {/if}
     <CPUWidget {cpuData} {tempData} {processList} />
-    <MemWidget {memData} {processList} />
+    <MemWidget {memData} {processList} {memoryAvailable} {swapAvailable} />
     <DiskWidget {diskData} {ioData} {processList} />
     <NetWidget {networkData} {localIp} {externalIp} hostname={summaryData.hostname} />
   </main>
@@ -328,6 +332,10 @@
 </div>
 
 <style>
+  .collection-status {
+    margin: 0 10px 8px;
+    color: var(--accentColor);
+  }
   .flex {
     width: 100%;
     height: 100%;

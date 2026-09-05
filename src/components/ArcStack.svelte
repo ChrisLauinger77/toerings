@@ -7,7 +7,7 @@
     value: number
     max: number
     label?: string
-    tooltip?: string
+    tooltip?: string[]
   }
 
   import { styleVars } from "../lib/actions"

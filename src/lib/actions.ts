@@ -11,10 +11,11 @@ export function styleVars(node: HTMLElement, props: Record<string, any>) {
     update(newProps: Record<string, any>) {
       Object.entries(newProps).forEach(([key, value]) => {
         node.style.setProperty(`--${key}`, value)
-        delete props[key]
       })
 
-      Object.keys(props).forEach(name => node.style.removeProperty(`--${name}`))
+      Object.keys(props)
+        .filter(name => !(name in newProps))
+        .forEach(name => node.style.removeProperty(`--${name}`))
       props = newProps
     }
   }
@@ -22,7 +23,7 @@ export function styleVars(node: HTMLElement, props: Record<string, any>) {
 
 export interface PlotData {
   x: Array<number>
-  y: Array<number>
+  y: Array<number | null>
   color?: Colord
 }
 
@@ -50,11 +51,14 @@ export function uPlotAction(node: HTMLElement, data: PlotData) {
   const plot = new uPlot(options, [x, y], node)
   return {
     update(newData: PlotData) {
-      plot.setData([newData.x, newData.y])
       plot.series[1].stroke = () =>
         (newData.color || colord("#fff")).alpha(0.7).lighten(0.2).toHslString()
       plot.series[1].fill = () =>
         (newData.color || colord("#fff")).alpha(0.5).lighten(0.2).toHslString()
+      plot.setData([newData.x, newData.y])
+    },
+    destroy() {
+      plot.destroy()
     }
   }
 }

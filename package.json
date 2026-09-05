@@ -14,7 +14,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "pretty": "prettier --write --plugin prettier-plugin-svelte .",
     "lint": "eslint .",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "node --import ./tests/register.mjs --test --test-isolation=none --test-timeout=10000 tests/*.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.11.1",

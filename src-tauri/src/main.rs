@@ -5,11 +5,12 @@
 
 mod data_harvester;
 mod utils;
+mod sampling;
 
-use std::{net::Ipv4Addr, sync::Mutex, time::Duration};
+use std::{net::Ipv4Addr, time::Duration};
 
 use crate::utils::error;
-use data_harvester::{Data, DataCollector};
+use sampling::{Sampler, Snapshot};
 #[cfg(not(target_os = "windows"))]
 use tauri::menu::{AboutMetadata, Menu, MenuItemBuilder, PredefinedMenuItem, Submenu};
 use tauri::{Emitter, Manager};
@@ -21,9 +22,8 @@ pub type Pid = usize;
 pub type Pid = libc::pid_t;
 
 #[tauri::command]
-fn collect_data(data_state: tauri::State<Mutex<DataCollector>>) -> Data {
-    futures::executor::block_on(data_state.lock().unwrap().update_data());
-    data_state.lock().unwrap().data.clone()
+fn collect_data(sampler: tauri::State<Sampler>) -> Snapshot {
+    sampler.snapshot()
 }
 
 fn parse_external_ipv4(response: &str) -> Option<String> {
@@ -177,10 +177,8 @@ fn set_menu_locale(_app: tauri::AppHandle, _locale: String) -> Result<(), String
 }
 
 fn main() {
-    let mut data_state = DataCollector::new();
-    data_state.init();
-
-    let builder = tauri::Builder::default().manage(Mutex::new(data_state));
+    let sampler = Sampler::start().expect("failed to start telemetry worker");
+    let builder = tauri::Builder::default().manage(sampler);
 
     #[cfg(not(target_os = "windows"))]
     let builder = builder.menu(|handle| build_menu(handle, "en"));
