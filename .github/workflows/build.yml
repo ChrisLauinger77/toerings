@@ -56,10 +56,18 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf rpm squashfs-tools xvfb
       - name: install frontend dependencies
         run: npm ci
+      - name: validate frontend
+        run: |
+          npm run check
+          npm run lint
+          npm test
+          npm run build
+      - name: test native collectors and lifecycle
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
       - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
         id: tauri
         with:
-          args: ${{ matrix.tauri-args }}
+          args: ${{ matrix.tauri-args }} -- --locked
       - name: "smoke-test Windows startup"
         if: matrix.platform == 'windows-latest'
         shell: pwsh
