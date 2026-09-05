@@ -5,15 +5,14 @@
     availableMonitors,
     currentMonitor,
     LogicalSize,
-    PhysicalPosition,
-    type Monitor,
-    type PhysicalSize
+    PhysicalPosition
   } from "@tauri-apps/api/window"
   import { listen } from "@tauri-apps/api/event"
   import { pick } from "lodash-es"
   import { onMount } from "svelte"
   import "uplot/dist/uPlot.min.css"
 
+  import { createWindowGeometry, type Position } from "./lib/windowGeometry"
   import { styleVars } from "./lib/actions"
   import { activeLocale } from "./lib/i18n"
   import {
@@ -40,7 +39,7 @@
 
   let preferencesVisible = false
   let preferencesOnLeft = false
-  let resizeRequest = 0
+  let geometry: ReturnType<typeof createWindowGeometry> | undefined
   let currentMenuLocale = ""
 
   $: if ($activeLocale !== currentMenuLocale) {
@@ -64,7 +63,7 @@
     }
   }
 
-  function saveWindowPosition(position: PhysicalPosition) {
+  function saveWindowPosition(position: Position) {
     try {
       localStorage.setItem(
         windowPositionStorageKey,
@@ -75,114 +74,77 @@
     }
   }
 
-  function clampWindowPosition(
-    position: PhysicalPosition,
-    size: PhysicalSize,
-    monitors: Monitor[]
-  ): PhysicalPosition | null {
-    let closestPosition: PhysicalPosition | null = null
-    let closestDistance = Number.POSITIVE_INFINITY
-
-    for (const monitor of monitors) {
-      const minX = monitor.position.x
-      const minY = monitor.position.y
-      const maxX = minX + Math.max(0, monitor.size.width - size.width)
-      const maxY = minY + Math.max(0, monitor.size.height - size.height)
-      const x = Math.min(Math.max(position.x, minX), maxX)
-      const y = Math.min(Math.max(position.y, minY), maxY)
-      const distance = (x - position.x) ** 2 + (y - position.y) ** 2
-
-      if (distance < closestDistance) {
-        closestDistance = distance
-        closestPosition = new PhysicalPosition(x, y)
-      }
-    }
-
-    return closestPosition
-  }
-
-  async function resizeWindow(showPreferences: boolean) {
-    const request = ++resizeRequest
-
-    try {
-      const [position, previousSize] = await Promise.all([
-        appWindow.outerPosition(),
-        appWindow.outerSize()
-      ])
-      if (request !== resizeRequest) return
-
-      await appWindow.setSize(new LogicalSize(showPreferences ? 650 : 325, 850))
-      const size = await appWindow.outerSize()
-      if (request !== resizeRequest) return
-
-      if (!showPreferences) {
-        if (preferencesOnLeft) {
-          await appWindow.setPosition(
-            new PhysicalPosition(position.x + previousSize.width - size.width, position.y)
-          )
-        }
-        preferencesOnLeft = false
-        return
-      }
-
-      const monitor = await currentMonitor()
-      if (!monitor || !preferencesVisible || request !== resizeRequest) return
-
-      const minX = monitor.position.x
-      const monitorRight = minX + monitor.size.width
-      preferencesOnLeft = position.x + size.width > monitorRight
-
-      if (preferencesOnLeft) {
-        const widthDifference = size.width - previousSize.width
-        const expandedX = Math.max(minX, position.x - widthDifference)
-        await appWindow.setPosition(new PhysicalPosition(expandedX, position.y))
-      }
-    } catch {
-      // Keep the current window geometry if monitor information is unavailable.
-    }
-  }
-
   onMount(() => {
     let disposed = false
+    let monitorTimer: ReturnType<typeof setTimeout> | undefined
     const unlisteners: Array<() => void> = []
 
+    function releaseListener(unlisten: () => void) {
+      try {
+        Promise.resolve(unlisten()).catch(() => {})
+      } catch {
+        // Continue releasing peers if a native listener has already disappeared.
+      }
+    }
+
+    geometry = createWindowGeometry({
+      position: () => appWindow.outerPosition(),
+      size: () => appWindow.outerSize(),
+      setSize: size => appWindow.setSize(new LogicalSize(size.width, size.height)),
+      setPosition: position => appWindow.setPosition(new PhysicalPosition(position.x, position.y)),
+      currentMonitor,
+      monitors: availableMonitors,
+      persist: saveWindowPosition,
+      sideChanged: left => {
+        preferencesOnLeft = left
+      }
+    })
+
     async function setupWindow() {
-      const savedPosition = loadWindowPosition()
-      if (savedPosition) {
+      await geometry!.restore(loadWindowPosition())
+      if (disposed) return
+
+      async function register(listener: Promise<() => void>) {
         try {
-          const [size, monitors] = await Promise.all([appWindow.outerSize(), availableMonitors()])
-          const restoredPosition = clampWindowPosition(savedPosition, size, monitors)
-          if (restoredPosition) await appWindow.setPosition(restoredPosition)
+          const unlisten = await listener
+          if (disposed) releaseListener(unlisten)
+          else unlisteners.push(unlisten)
         } catch {
-          // Fall back to the configured position if restoring fails.
+          // One unavailable native event must not leak another listener.
         }
       }
-
-      const listeners = await Promise.all([
-        listen("openPreferences", () => {
-          preferencesVisible = true
-        }),
-        appWindow.onMoved(({ payload }) => {
-          saveWindowPosition(payload)
-        })
+      await Promise.all([
+        register(
+          listen("openPreferences", () => {
+            preferencesVisible = true
+          })
+        ),
+        register(
+          appWindow.onMoved(({ payload }) => {
+            geometry?.moved(payload)
+            clearTimeout(monitorTimer)
+            monitorTimer = setTimeout(() => geometry?.refreshMonitor(), 250)
+          })
+        ),
+        register(
+          appWindow.onScaleChanged(() => {
+            geometry?.resize(preferencesVisible)
+          })
+        )
       ])
-
-      if (disposed) {
-        listeners.forEach(unlisten => unlisten())
-      } else {
-        unlisteners.push(...listeners)
-      }
     }
 
     setupWindow()
 
     return () => {
       disposed = true
-      unlisteners.forEach(unlisten => unlisten())
+      clearTimeout(monitorTimer)
+      geometry?.dispose()
+      unlisteners.forEach(releaseListener)
     }
   })
 
-  $: resizeWindow(preferencesVisible)
+  $: geometry?.resize(preferencesVisible)
 
   function onKeydown(e: KeyboardEvent) {
     if ((e.ctrlKey || e.metaKey) && e.key === ",") {
@@ -350,11 +312,11 @@
 
   main {
     width: 325px;
-    height: 850px;
+    height: 100%;
     flex: 0 0 325px;
     padding: 10px;
     max-height: 850px;
-    overflow: hidden;
+    overflow-y: auto;
     font-family: var(--fontFamily);
     color: var(--foregroundColor);
   }
