@@ -134,7 +134,6 @@ pub struct DataCollector {
     prev_idle: f64,
     #[cfg(target_os = "linux")]
     prev_non_idle: f64,
-    mem_total_kb: u64,
     use_current_cpu_total: bool,
     unnormalized_cpu: bool,
     last_collection_time: Instant,
@@ -169,7 +168,6 @@ impl DataCollector {
             prev_idle: 0_f64,
             #[cfg(target_os = "linux")]
             prev_non_idle: 0_f64,
-            mem_total_kb: 0,
             use_current_cpu_total: false,
             unnormalized_cpu: false,
             last_collection_time: Instant::now(),
@@ -185,15 +183,8 @@ impl DataCollector {
     }
 
     pub fn init(&mut self) {
-        #[cfg(target_os = "linux")]
-        {
-            futures::executor::block_on(self.initialize_memory_size());
-        }
         #[cfg(not(target_os = "linux"))]
         {
-            self.sys.refresh_memory();
-            self.mem_total_kb = self.sys.total_memory();
-
             self.sys.refresh_cpu_all();
         }
 
@@ -215,15 +206,6 @@ impl DataCollector {
         std::thread::sleep(std::time::Duration::from_millis(250));
 
         self.data.cleanup();
-    }
-
-    #[cfg(target_os = "linux")]
-    async fn initialize_memory_size(&mut self) {
-        self.mem_total_kb = if let Ok(mem) = heim::memory::memory().await {
-            mem.total().get::<heim::units::information::kilobyte>()
-        } else {
-            1
-        };
     }
 
     pub async fn update_data(&mut self) {
@@ -321,7 +303,6 @@ impl DataCollector {
                     self.use_current_cpu_total,
                     normalize_cpu,
                     current_instant,
-                    self.mem_total_kb,
                     &mut self.user_table,
                 )
             }
@@ -333,7 +314,6 @@ impl DataCollector {
                         &self.sys,
                         self.use_current_cpu_total,
                         self.unnormalized_cpu,
-                        self.mem_total_kb,
                         current_instant.duration_since(self.last_collection_time),
                         &mut self.user_table,
                     )
@@ -344,7 +324,6 @@ impl DataCollector {
                         &self.sys,
                         self.use_current_cpu_total,
                         self.unnormalized_cpu,
-                        self.mem_total_kb,
                         current_instant.duration_since(self.last_collection_time),
                     )
                 }

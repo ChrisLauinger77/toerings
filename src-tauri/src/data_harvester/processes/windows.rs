@@ -8,7 +8,6 @@ pub fn get_process_data(
     sys: &System,
     use_current_cpu_total: bool,
     unnormalized_cpu: bool,
-    mem_total_kb: u64,
     elapsed: std::time::Duration,
 ) -> crate::utils::error::Result<Vec<ProcessHarvest>> {
     let mut process_vector: Vec<ProcessHarvest> = Vec::new();
@@ -69,14 +68,8 @@ pub fn get_process_data(
         let process_state = (process_val.status().to_string(), 'R');
         process_vector.push(ProcessHarvest {
             pid: process_val.pid().as_u32() as _,
-            parent_pid: process_val.parent().map(|p| p.as_u32() as _),
             name,
             command,
-            mem_usage_percent: if mem_total_kb > 0 {
-                process_val.memory() as f64 * 100.0 / mem_total_kb as f64
-            } else {
-                0.0
-            },
             mem_usage_bytes: process_val.memory(),
             cpu_usage_percent: process_cpu_usage,
             read_bytes_per_sec: super::super::rates::bytes_per_second(disk_usage.read_bytes, elapsed),

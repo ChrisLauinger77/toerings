@@ -122,7 +122,6 @@ fn read_proc(
     cpu_fraction: f64,
     use_current_cpu_total: bool,
     now: Instant,
-    mem_total_kb: u64,
     user_table: &mut UserTable,
 ) -> error::Result<(ProcessHarvest, PrevProcDetails)> {
     let stat = process.stat()?;
@@ -168,10 +167,7 @@ fn read_proc(
         prev_proc.for_start_time(stat.starttime).map(|previous| previous.cpu_time),
         use_current_cpu_total,
     );
-    let parent_pid = Some(stat.ppid);
     let mem_usage_bytes = stat.rss_bytes().get();
-    let mem_usage_kb = mem_usage_bytes / 1024;
-    let mem_usage_percent = mem_usage_kb as f64 / mem_total_kb as f64 * 100.0;
 
     // A missing I/O reading invalidates only that baseline. Reappearing counters
     // must not attribute the process's lifetime traffic to one sampling interval.
@@ -185,9 +181,7 @@ fn read_proc(
     Ok((
         ProcessHarvest {
             pid: process.pid,
-            parent_pid,
             cpu_usage_percent,
-            mem_usage_percent,
             mem_usage_bytes,
             name,
             command,
@@ -226,7 +220,6 @@ pub fn get_process_data(
     use_current_cpu_total: bool,
     normalization: CpuUsageStrategy,
     now: Instant,
-    mem_total_kb: u64,
     user_table: &mut UserTable,
 ) -> crate::utils::error::Result<Vec<ProcessHarvest>> {
     // Commit aggregate CPU baselines only after a successful process enumeration.
@@ -262,7 +255,6 @@ pub fn get_process_data(
                             cpu_fraction,
                             use_current_cpu_total,
                             now,
-                            mem_total_kb,
                             user_table,
                         ) {
                             *prev_proc_details = new_details;
@@ -310,6 +302,104 @@ fn io_rates(current: Option<(u64, u64, Instant)>, previous: Option<(u64, u64, In
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    struct ProcFixture(std::path::PathBuf);
+
+    impl ProcFixture {
+        fn new(name: &str, command: Option<&[u8]>) -> Self {
+            static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let root = std::env::temp_dir().join(format!(
+                "toerings-process-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            ));
+            std::fs::create_dir(&root).unwrap();
+            let fixture = Self(root);
+            let path = fixture.0.join("42");
+            std::fs::create_dir(&path).unwrap();
+
+            // /proc/PID/stat fields 3 through 52. RSS is in pages; CPU time is
+            // in ticks. Keep the kernel record intact even for unexposed fields.
+            let mut fields = vec!["0"; 50];
+            for (field, value) in [
+                (3, "R"), (4, "1"), (14, "120"), (15, "30"), (22, "100"), (24, "10"),
+            ] {
+                fields[field - 3] = value;
+            }
+            std::fs::write(
+                path.join("stat"), format!("42 ({name}) {}\n", fields.join(" ")),
+            ).unwrap();
+            std::fs::write(path.join("io"), concat!(
+                "rchar: 0\nwchar: 0\nsyscr: 0\nsyscw: 0\n",
+                "read_bytes: 5000\nwrite_bytes: 10000\ncancelled_write_bytes: 0\n",
+            )).unwrap();
+            if let Some(command) = command {
+                std::fs::write(path.join("cmdline"), command).unwrap();
+            }
+            fixture
+        }
+
+        fn process(&self) -> Process {
+            Process::new_with_root(self.0.join("42")).unwrap()
+        }
+    }
+
+    impl Drop for ProcFixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn process_sample_retains_names_cpu_memory_and_io_without_unused_metadata() {
+        let fixture = ProcFixture::new(
+            "very-long-proce", Some(b"/usr/bin/very-long-process\0--flag\0"),
+        );
+        let process = fixture.process();
+        let mut users = UserTable::default();
+        users.uid_user_mapping.insert(process.uid().unwrap(), "fixture".into());
+        let then = Instant::now();
+        let previous = PrevProcDetails {
+            start_time: Some(100), cpu_time: 100, io: Some((1000, 2000, then)),
+        };
+        let (sample, baseline) = read_proc(
+            &previous, &process, 200.0, 0.5, false, then + Duration::from_secs(2), &mut users,
+        ).unwrap();
+        assert_eq!(sample.pid, 42);
+        assert_eq!(sample.name, "very-long-process");
+        assert_eq!(sample.command, "/usr/bin/very-long-process --flag");
+        assert_eq!(sample.cpu_usage_percent, 12.5);
+        assert_eq!(sample.mem_usage_bytes, 10 * procfs::page_size());
+        assert_eq!(
+            (sample.read_bytes_per_sec, sample.write_bytes_per_sec), (2000, 4000),
+        );
+        assert_eq!((sample.total_read_bytes, sample.total_write_bytes), (5000, 10000));
+        assert_eq!(baseline.cpu_time, 150);
+        assert_eq!(baseline.start_time, Some(100));
+        let json = serde_json::to_value(&sample).unwrap();
+        assert!(json.get("parent_pid").is_none());
+        assert!(json.get("mem_usage_percent").is_none());
+        assert_eq!(json["mem_usage_bytes"], sample.mem_usage_bytes);
+        assert_eq!(json["cpu_usage_percent"], 12.5);
+    }
+
+    #[test]
+    fn process_name_and_command_fallbacks_survive_missing_or_empty_cmdline() {
+        for (command, expected) in [(None, "worker"), (Some(b"".as_slice()), "[worker]")] {
+            let fixture = ProcFixture::new("worker", command);
+            let process = fixture.process();
+            let mut users = UserTable::default();
+            users.uid_user_mapping.insert(process.uid().unwrap(), "fixture".into());
+            let (sample, _) = read_proc(
+                &PrevProcDetails::default(), &process, 200.0, 0.5, false, Instant::now(), &mut users,
+            ).unwrap();
+            assert_eq!(sample.name, "worker");
+            assert_eq!(sample.command, expected);
+            assert_eq!(sample.mem_usage_bytes, 10 * procfs::page_size());
+            assert_eq!(sample.cpu_usage_percent, 0.0);
+            assert_eq!((sample.read_bytes_per_sec, sample.write_bytes_per_sec), (0, 0));
+        }
+    }
 
     #[test]
     fn parses_actual_proc_stat_lines_including_steal() {

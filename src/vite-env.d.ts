@@ -10,9 +10,7 @@ interface Process {
   name: string
   command: string
   pid: number
-  parent_pid: number | null
   cpu_usage_percent: number
-  mem_usage_percent: number
   mem_usage_bytes: number
   read_bytes_per_sec: number
   write_bytes_per_sec: number

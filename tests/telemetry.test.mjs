@@ -105,6 +105,69 @@ test("disk tooltip content is escaped even when supplied by mounted metadata", (
   assert.ok(!body.includes("<img"))
 })
 
+test("process widgets retain names, rankings, memory bytes and I/O without unused metadata", () => {
+  const processes = [
+    {
+      name: "cpu-worker",
+      cpu_usage_percent: 75,
+      mem_usage_bytes: 1024,
+      read_bytes_per_sec: 100,
+      write_bytes_per_sec: 200
+    },
+    {
+      name: "memory-worker",
+      cpu_usage_percent: 25,
+      mem_usage_bytes: 2048,
+      read_bytes_per_sec: 300,
+      write_bytes_per_sec: 400
+    }
+  ]
+  const sample = normalizeData({ ...missing, list_of_processes: processes })
+  assert.equal(sample.read, 400)
+  assert.equal(sample.write, 600)
+  const memory = { mem_total_in_kib: 100, mem_used_in_kib: 50, use_percent: 50 }
+  const widgets = [
+    [
+      CPUWidget,
+      { cpuData: { perCoreUtil: [75], cpuLoads: [0.75] }, tempData: [] },
+      "cpu-worker",
+      "memory-worker",
+      "75.00%"
+    ],
+    [
+      MemWidget,
+      { memData: { ram: { usage: memory, percentages: [50] }, swap: { usage: memory } } },
+      "memory-worker",
+      "cpu-worker",
+      "2.0kB"
+    ],
+    [
+      DiskWidget,
+      { diskData: [], ioData: [{ read: sample.read, write: sample.write }] },
+      "memory-worker",
+      "cpu-worker",
+      "r:300B, w:400B"
+    ]
+  ]
+  for (const [widget, props, first, second, expectedValue] of widgets) {
+    const body = render(widget, { props: { ...props, processList: sample.processes } }).body
+    assert.ok(body.includes(first) && body.indexOf(first) < body.indexOf(second))
+    assert.ok(body.includes(expectedValue), expectedValue)
+    assert.ok(!/NaN|undefined|Infinity/.test(body))
+    const legacy = render(widget, {
+      props: {
+        ...props,
+        processList: processes.map(process => ({
+          ...process,
+          parent_pid: 1,
+          mem_usage_percent: 99
+        }))
+      }
+    }).body
+    assert.equal(body, legacy, "removing unused IPC properties must not change rendered output")
+  }
+})
+
 test("distinct volumes with equal usage remain visible", () => {
   const a = { name: "a", mount_point: "/a", free_space: 10, used_space: 0, total_space: 10 }
   const b = { ...a, name: "b", mount_point: "/b" }
