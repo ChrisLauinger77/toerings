@@ -3,21 +3,19 @@
 use sysinfo::System;
 
 use super::ProcessHarvest;
-use crate::{data_harvester::processes::UserTable, Pid};
+use crate::Pid;
 
 pub fn get_process_data(
     sys: &System,
     use_current_cpu_total: bool,
     unnormalized_cpu: bool,
     elapsed: std::time::Duration,
-    user_table: &mut UserTable,
 ) -> crate::utils::error::Result<Vec<ProcessHarvest>> {
     super::macos_freebsd::get_process_data(
         sys,
         use_current_cpu_total,
         unnormalized_cpu,
         elapsed,
-        user_table,
         get_macos_process_cpu_usage,
     )
 }

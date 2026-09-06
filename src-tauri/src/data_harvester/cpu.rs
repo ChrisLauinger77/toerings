@@ -1,8 +1,6 @@
-//! Data collection for CPU usage and load average.
+//! Data collection for CPU usage.
 //!
 //! For CPU usage, Linux and macOS are handled by Heim, Windows and FreeBSD by sysinfo.
-//!
-//! For load average, macOS and Linux are supported through Heim, FreeBSD by sysinfo.
 
 use serde::Serialize;
 
@@ -15,8 +13,6 @@ cfg_if::cfg_if! {
         pub use self::sysinfo::*;
     }
 }
-
-pub type LoadAvgHarvest = [f32; 3];
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum CpuDataType {

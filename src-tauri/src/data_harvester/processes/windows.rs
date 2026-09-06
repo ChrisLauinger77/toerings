@@ -74,8 +74,6 @@ pub fn get_process_data(
             cpu_usage_percent: process_cpu_usage,
             read_bytes_per_sec: super::super::rates::bytes_per_second(disk_usage.read_bytes, elapsed),
             write_bytes_per_sec: super::super::rates::bytes_per_second(disk_usage.written_bytes, elapsed),
-            total_read_bytes: disk_usage.total_read_bytes,
-            total_write_bytes: disk_usage.total_written_bytes,
             process_state,
         });
     }

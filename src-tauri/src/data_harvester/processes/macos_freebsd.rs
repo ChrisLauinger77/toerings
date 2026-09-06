@@ -6,14 +6,13 @@ use std::io;
 use sysinfo::{ProcessStatus, System};
 
 use super::ProcessHarvest;
-use crate::{data_harvester::processes::UserTable, utils::error::Result, Pid};
+use crate::{utils::error::Result, Pid};
 
 pub fn get_process_data<F>(
     sys: &System,
     use_current_cpu_total: bool,
     unnormalized_cpu: bool,
     elapsed: std::time::Duration,
-    user_table: &mut UserTable,
     backup_cpu_proc_usage: F,
 ) -> Result<Vec<ProcessHarvest>>
 where
@@ -78,7 +77,6 @@ where
             let ps = process_val.status();
             (ps.to_string(), convert_process_status_to_char(ps))
         };
-        let uid = process_val.user_id().map(|u| **u);
         let pid = process_val.pid().as_u32() as Pid;
         process_vector.push(ProcessHarvest {
             pid,
@@ -88,18 +86,7 @@ where
             cpu_usage_percent: process_cpu_usage,
             read_bytes_per_sec: super::super::rates::bytes_per_second(disk_usage.read_bytes, elapsed),
             write_bytes_per_sec: super::super::rates::bytes_per_second(disk_usage.written_bytes, elapsed),
-            total_read_bytes: disk_usage.total_read_bytes,
-            total_write_bytes: disk_usage.total_written_bytes,
             process_state,
-            uid,
-            user: uid
-                .and_then(|uid| {
-                    user_table
-                        .get_uid_to_username_mapping(uid)
-                        .map(Into::into)
-                        .ok()
-                })
-                .unwrap_or_else(|| "N/A".into()),
         });
     }
 

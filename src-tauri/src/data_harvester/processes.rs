@@ -21,13 +21,6 @@ cfg_if::cfg_if! {
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(target_family = "unix")] {
-        pub mod unix;
-        pub use self::unix::*;
-    }
-}
-
 use serde::Serialize;
 
 use crate::Pid;
@@ -55,22 +48,9 @@ pub struct ProcessHarvest {
     /// Bytes written per second.
     pub write_bytes_per_sec: u64,
 
-    /// The total number of bytes read by the process.
-    pub total_read_bytes: u64,
-
-    /// The total number of bytes written by the process.
-    pub total_write_bytes: u64,
-
     /// The current state of the process (e.g. zombie, asleep)
     pub process_state: (String, char),
 
-    /// This is the *effective* user ID of the process. This is only used on Unix platforms.
-    #[cfg(target_family = "unix")]
-    pub uid: Option<libc::uid_t>,
-
-    /// This is the process' user. This is only used on Unix platforms.
-    #[cfg(target_family = "unix")]
-    pub user: std::borrow::Cow<'static, str>,
     // TODO: Additional fields
     // pub rss_kb: u64,
     // pub virt_kb: u64,

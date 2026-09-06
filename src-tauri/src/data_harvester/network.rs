@@ -16,12 +16,10 @@ cfg_if::cfg_if! {
 }
 
 #[derive(Default, Clone, Debug, Serialize)]
-/// Rates are bytes per second; totals are bytes.
+/// Rates are bytes per second.
 pub struct NetworkHarvest {
     pub rx: u64,
     pub tx: u64,
-    pub total_rx: u64,
-    pub total_tx: u64,
 }
 
 #[derive(Debug, Default)]
@@ -39,8 +37,6 @@ impl NetworkHistory {
         let mut next = std::collections::HashMap::new();
         let mut data = NetworkHarvest::default();
         for (name, rx, tx) in counters {
-            data.total_rx = data.total_rx.saturating_add(rx);
-            data.total_tx = data.total_tx.saturating_add(tx);
             if let Some(&(previous_rx, previous_tx, previous_time)) = self.interfaces.get(&name) {
                 let elapsed = now.saturating_duration_since(previous_time);
                 data.rx = data.rx.saturating_add(bytes_per_second(rx.saturating_sub(previous_rx), elapsed));
@@ -65,8 +61,13 @@ mod tests {
         let now = Instant::now();
         assert_eq!(history.sample([counter("a", 100)], now).rx, 0);
         let sample = history.sample([counter("a", 1_048_676)], now + Duration::from_secs(1));
-        assert_eq!(sample.rx, 1_048_576);
-        assert_eq!(sample.total_rx, 1_048_676);
+        assert_eq!((sample.rx, sample.tx), (1_048_576, 1_048_576));
+        assert_eq!(serde_json::to_value(&sample).unwrap(), serde_json::json!({
+            "rx": 1_048_576, "tx": 1_048_576,
+        }));
+        // Raw counters and sample times must survive removal of exported totals.
+        let sample = history.sample([counter("a", 2_097_252)], now + Duration::from_millis(1500));
+        assert_eq!((sample.rx, sample.tx), (2_097_152, 2_097_152));
     }
 
     #[test]

@@ -31,7 +31,7 @@ const full = {
   cpu: Array.from({ length: cpuCount }, (_, index) => ({ cpu_usage: 20 + (index % 80) })),
   memory: { mem_total_in_kib: 8 * 1024 ** 2, mem_used_in_kib: 4 * 1024 ** 2, use_percent: 50 },
   swap: { mem_total_in_kib: 0, mem_used_in_kib: 0, use_percent: null },
-  network: { rx: 1024 ** 2, tx: 512 * 1024, total_rx: 0, total_tx: 0 },
+  network: { rx: 1024 ** 2, tx: 512 * 1024 },
   list_of_processes: [],
   temperature_sensors: [{ name: "fixture", temperature: 42 }],
   disks: [

@@ -1,7 +1,7 @@
 //! Disk stats through heim.
 //! Supports macOS, Linux, and Windows.
 
-use crate::data_harvester::disks::{DiskHarvest, IoData, IoHarvest};
+use crate::data_harvester::disks::DiskHarvest;
 
 cfg_if::cfg_if! {
     if #[cfg(target_os = "linux")] {
@@ -11,32 +11,6 @@ cfg_if::cfg_if! {
         pub mod windows_macos;
         pub use windows_macos::*;
     }
-}
-
-pub async fn get_io_usage() -> crate::utils::error::Result<Option<IoHarvest>> {
-    use futures::StreamExt;
-
-    let mut io_hash: std::collections::HashMap<String, Option<IoData>> =
-        std::collections::HashMap::new();
-
-    let counter_stream = heim::disk::io_counters().await?;
-    futures::pin_mut!(counter_stream);
-
-    while let Some(io) = counter_stream.next().await {
-        if let Ok(io) = io {
-            let mount_point = io.device_name().to_str().unwrap_or("Name Unavailable");
-
-            io_hash.insert(
-                mount_point.to_string(),
-                Some(IoData {
-                    read_bytes: io.read_bytes().get::<heim::units::information::byte>(),
-                    write_bytes: io.write_bytes().get::<heim::units::information::byte>(),
-                }),
-            );
-        }
-    }
-
-    Ok(Some(io_hash))
 }
 
 pub async fn get_disk_usage() -> crate::utils::error::Result<Option<Vec<DiskHarvest>>> {

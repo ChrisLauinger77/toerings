@@ -7,7 +7,6 @@ use sysinfo::System;
 
 use super::ProcessHarvest;
 use crate::data_harvester::deserialize_xo;
-use crate::data_harvester::processes::UserTable;
 
 #[derive(Deserialize, Debug, Default)]
 #[serde(rename_all = "kebab-case")]
@@ -29,14 +28,12 @@ pub fn get_process_data(
     use_current_cpu_total: bool,
     unnormalized_cpu: bool,
     elapsed: std::time::Duration,
-    user_table: &mut UserTable,
 ) -> crate::utils::error::Result<Vec<ProcessHarvest>> {
     super::macos_freebsd::get_process_data(
         sys,
         use_current_cpu_total,
         unnormalized_cpu,
         elapsed,
-        user_table,
         get_freebsd_process_cpu_usage,
     )
 }

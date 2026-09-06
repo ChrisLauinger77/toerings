@@ -1,4 +1,4 @@
-//! Data collection for disks (IO, usage, space, etc.).
+//! Data collection for disk capacity and usage.
 //!
 //! For Linux, macOS, and Windows, this is handled by heim. For FreeBSD there is a custom
 //! implementation.
@@ -23,11 +23,3 @@ pub struct DiskHarvest {
     pub used_space: Option<u64>,
     pub total_space: Option<u64>,
 }
-
-#[derive(Clone, Debug, Serialize)]
-pub struct IoData {
-    pub read_bytes: u64,
-    pub write_bytes: u64,
-}
-
-pub type IoHarvest = std::collections::HashMap<String, Option<IoData>>;
