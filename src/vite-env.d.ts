@@ -14,11 +14,7 @@ interface Process {
   mem_usage_bytes: number
   read_bytes_per_sec: number
   write_bytes_per_sec: number
-  total_read_bytes: number
-  total_write_bytes: number
   process_state: [string, string]
-  uid?: number | null
-  user?: string | null
 }
 
 interface DiskData {
@@ -38,8 +34,6 @@ interface MemData {
 interface NetData {
   rx: number
   tx: number
-  total_rx: number
-  total_tx: number
 }
 
 interface TempData {
@@ -63,16 +57,10 @@ interface SummaryData {
   os_version: string | null
 }
 
-interface IOData {
-  read_bytes: number
-  write_bytes: number
-}
-
 interface Data {
   sequence: number
   age_ms: number
   failed: boolean
-  last_collection_time: number
   uptime: string
   hostname: string | null
   kernel_name: string | null
@@ -80,11 +68,9 @@ interface Data {
   os_version: string | null
   list_of_processes: Array<Process> | null
   cpu: Array<CPUData> | null
-  load_avg: Array<number> | null
   memory: MemData | null
   swap: MemData | null
   disks: Array<DiskData> | null
-  io: Record<string, IOData | null> | null
   local_ip: string | null
   network: NetData | null
   temperature_sensors: Array<TempData> | null

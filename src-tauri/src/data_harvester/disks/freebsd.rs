@@ -4,7 +4,7 @@ use std::io;
 
 use serde::Deserialize;
 
-use super::{DiskHarvest, IoHarvest};
+use super::DiskHarvest;
 use crate::app::Filter;
 use crate::data_harvester::deserialize_xo;
 
@@ -22,21 +22,6 @@ struct FileSystem {
     used_blocks: u64,
     available_blocks: u64,
     mounted_on: String,
-}
-
-pub async fn get_io_usage(actually_get: bool) -> crate::utils::error::Result<Option<IoHarvest>> {
-    if !actually_get {
-        return Ok(None);
-    }
-
-    let io_harvest = get_disk_info().map(|storage_system_information| {
-        storage_system_information
-            .filesystem
-            .into_iter()
-            .map(|disk| (disk.name, None))
-            .collect()
-    })?;
-    Ok(Some(io_harvest))
 }
 
 pub async fn get_disk_usage(

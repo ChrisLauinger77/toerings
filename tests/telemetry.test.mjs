@@ -50,7 +50,7 @@ test("blocked startup becomes stale after five seconds and recovers on publicati
       cpu: [],
       memory,
       swap: memory,
-      network: { rx: 0, tx: 0, total_rx: 0, total_tx: 0 },
+      network: { rx: 0, tx: 0 },
       list_of_processes: [],
       temperature_sensors: [],
       disks: []
@@ -160,11 +160,51 @@ test("process widgets retain names, rankings, memory bytes and I/O without unuse
         processList: processes.map(process => ({
           ...process,
           parent_pid: 1,
-          mem_usage_percent: 99
+          mem_usage_percent: 99,
+          uid: 1000,
+          user: "worker",
+          total_read_bytes: 1000000,
+          total_write_bytes: 2000000
         }))
       }
     }).body
     assert.equal(body, legacy, "removing unused IPC properties must not change rendered output")
+  }
+})
+
+test("displayed load, throughput and freshness do not depend on removed snapshot fields", () => {
+  const memory = { mem_total_in_kib: 100, mem_used_in_kib: 50, use_percent: 50 }
+  const data = {
+    ...missing,
+    cpu: [
+      { data_type: { Cpu: 0 }, cpu_usage: 75 },
+      { data_type: { Cpu: 1 }, cpu_usage: 25 }
+    ],
+    memory,
+    swap: memory,
+    network: { rx: 1024, tx: 2048 },
+    list_of_processes: [{ read_bytes_per_sec: 100, write_bytes_per_sec: 200 }],
+    temperature_sensors: [],
+    disks: []
+  }
+  const legacy = {
+    ...data,
+    last_collection_time: 123456,
+    load_avg: [99, 98, 97],
+    io: { device: { read_bytes: 1000000, write_bytes: 2000000 } },
+    network: { ...data.network, total_rx: 3000000, total_tx: 4000000 }
+  }
+  const sample = normalizeData(data)
+  assert.deepEqual(sample, normalizeData(legacy))
+  assert.equal(sample.cpuLoad, 1)
+  assert.equal(sample.read, 100)
+  assert.equal(sample.write, 200)
+  assert.equal(sample.rx, 1024)
+  assert.equal(sample.tx, 2048)
+  for (const snapshot of [data, legacy]) {
+    assert.equal(collectionStatus(snapshot), "ready")
+    assert.equal(collectionStatus({ ...snapshot, age_ms: 6000 }), "stale")
+    assert.equal(collectionStatus({ ...snapshot, failed: true }), "stale")
   }
 })
 

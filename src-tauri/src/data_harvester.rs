@@ -36,17 +36,13 @@ pub mod temperature;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Data {
-    #[serde(with = "serde_millis")]
-    pub last_collection_time: Instant,
     pub cpu: Option<cpu::CpuHarvest>,
-    pub load_avg: Option<cpu::LoadAvgHarvest>,
     pub memory: Option<memory::MemHarvest>,
     pub swap: Option<memory::MemHarvest>,
     pub temperature_sensors: Option<Vec<temperature::TempHarvest>>,
     pub network: Option<network::NetworkHarvest>,
     pub list_of_processes: Option<Vec<processes::ProcessHarvest>>,
     pub disks: Option<Vec<disks::DiskHarvest>>,
-    pub io: Option<disks::IoHarvest>,
     #[serde(with = "humantime_serde")]
     #[serde(default)]
     pub uptime: Duration,
@@ -66,15 +62,12 @@ pub struct Data {
 impl Default for Data {
     fn default() -> Self {
         Data {
-            last_collection_time: Instant::now(),
             cpu: None,
-            load_avg: None,
             memory: None,
             swap: None,
             temperature_sensors: None,
             list_of_processes: None,
             disks: None,
-            io: None,
             network: None,
             uptime: Duration::ZERO,
             hostname: None,
@@ -94,14 +87,12 @@ impl Default for Data {
 
 impl Data {
     pub fn cleanup(&mut self) {
-        self.io = None;
         self.temperature_sensors = None;
         self.list_of_processes = None;
         self.disks = None;
         self.memory = None;
         self.swap = None;
         self.cpu = None;
-        self.load_avg = None;
 
         self.network = None;
         #[cfg(feature = "battery")]
@@ -143,8 +134,6 @@ pub struct DataCollector {
     battery_manager: Option<Manager>,
     #[cfg(feature = "battery")]
     battery_list: Option<Vec<Battery>>,
-    #[cfg(target_family = "unix")]
-    user_table: self::processes::UserTable,
 }
 
 impl DataCollector {
@@ -177,8 +166,6 @@ impl DataCollector {
             battery_manager: None,
             #[cfg(feature = "battery")]
             battery_list: None,
-            #[cfg(target_family = "unix")]
-            user_table: Default::default(),
         }
     }
 
@@ -217,7 +204,7 @@ impl DataCollector {
             self.sys.refresh_processes_specifics(
                 sysinfo::ProcessesToUpdate::All,
                 true,
-                sysinfo::ProcessRefreshKind::everything(),
+                sysinfo::ProcessRefreshKind::everything().without_user(),
             );
             #[cfg(not(target_os = "windows"))]
             self.components.refresh(true);
@@ -262,14 +249,6 @@ impl DataCollector {
             }
         }
 
-        #[cfg(target_family = "unix")]
-        {
-            // Load Average
-            if let Ok(load_avg_data) = cpu::get_load_avg().await {
-                self.data.load_avg = Some(load_avg_data);
-            }
-        }
-
         // Batteries
         #[cfg(feature = "battery")]
         {
@@ -303,30 +282,16 @@ impl DataCollector {
                     self.use_current_cpu_total,
                     normalize_cpu,
                     current_instant,
-                    &mut self.user_table,
                 )
             }
             #[cfg(not(target_os = "linux"))]
             {
-                #[cfg(target_family = "unix")]
-                {
-                    processes::get_process_data(
-                        &self.sys,
-                        self.use_current_cpu_total,
-                        self.unnormalized_cpu,
-                        current_instant.duration_since(self.last_collection_time),
-                        &mut self.user_table,
-                    )
-                }
-                #[cfg(not(target_family = "unix"))]
-                {
-                    processes::get_process_data(
-                        &self.sys,
-                        self.use_current_cpu_total,
-                        self.unnormalized_cpu,
-                        current_instant.duration_since(self.last_collection_time),
-                    )
-                }
+                processes::get_process_data(
+                    &self.sys,
+                    self.use_current_cpu_total,
+                    self.unnormalized_cpu,
+                    current_instant.duration_since(self.last_collection_time),
+                )
             }
         } {
             // NB: To avoid duplicate sorts on rerenders/events, we sort the processes by PID here.
@@ -382,13 +347,11 @@ impl DataCollector {
             }
         };
         let disk_data_fut = disks::get_disk_usage();
-        let disk_io_usage_fut = disks::get_io_usage();
 
-        let (net_data, mem_res, disk_res, io_res) = join!(
+        let (net_data, mem_res, disk_res) = join!(
             network_data_fut,
             mem_data_fut,
             disk_data_fut,
-            disk_io_usage_fut,
         );
 
         if let Ok(net_data) = net_data {
@@ -417,10 +380,6 @@ impl DataCollector {
             self.data.disks = disks;
         }
 
-        if let Ok(io) = io_res {
-            self.data.io = io;
-        }
-
         self.data.uptime = Duration::from_secs(System::uptime());
         self.data.hostname = System::host_name();
         self.data.kernel_name = System::name();
@@ -429,7 +388,6 @@ impl DataCollector {
         self.data.local_ip = local_ip_address::local_ip().ok();
 
         // Update time
-        self.data.last_collection_time = current_instant;
         self.last_collection_time = current_instant;
     }
 }

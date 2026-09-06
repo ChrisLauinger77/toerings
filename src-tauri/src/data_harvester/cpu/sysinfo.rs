@@ -3,10 +3,7 @@
 
 use std::collections::VecDeque;
 
-use sysinfo::{LoadAvg, System};
-
 use super::{CpuData, CpuDataType, CpuHarvest, PastCpuTotal, PastCpuWork};
-use crate::data_harvester::cpu::LoadAvgHarvest;
 
 pub async fn get_cpu_data_list(
     sys: &sysinfo::System,
@@ -32,10 +29,4 @@ pub async fn get_cpu_data_list(
     }
 
     Ok(Vec::from(cpu_deque))
-}
-
-pub async fn get_load_avg() -> crate::error::Result<LoadAvgHarvest> {
-    let LoadAvg { one, five, fifteen } = System::load_average();
-
-    Ok([one as f32, five as f32, fifteen as f32])
 }

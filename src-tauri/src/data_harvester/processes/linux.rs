@@ -10,7 +10,7 @@ use procfs::process::{Process, Stat};
 use procfs::WithCurrentSystemInfo;
 use sysinfo::ProcessStatus;
 
-use super::{ProcessHarvest, UserTable};
+use super::ProcessHarvest;
 use crate::data_harvester::cpu::Point;
 use crate::utils::error::{self, ToeError};
 use crate::Pid;
@@ -122,7 +122,6 @@ fn read_proc(
     cpu_fraction: f64,
     use_current_cpu_total: bool,
     now: Instant,
-    user_table: &mut UserTable,
 ) -> error::Result<(ProcessHarvest, PrevProcDetails)> {
     let stat = process.stat()?;
     let (command, name) = {
@@ -174,9 +173,6 @@ fn read_proc(
     let io = process.io().ok().map(|io| (io.read_bytes, io.write_bytes, now));
     let previous_io = prev_proc.for_start_time(stat.starttime).and_then(|previous| previous.io);
     let (read_bytes_per_sec, write_bytes_per_sec) = io_rates(io, previous_io);
-    let (total_read_bytes, total_write_bytes) = io.map(|(read, write, _)| (read, write)).unwrap_or((0, 0));
-
-    let uid = process.uid()?;
 
     Ok((
         ProcessHarvest {
@@ -187,14 +183,7 @@ fn read_proc(
             command,
             read_bytes_per_sec,
             write_bytes_per_sec,
-            total_read_bytes,
-            total_write_bytes,
             process_state,
-            uid: Some(uid),
-            user: user_table
-                .get_uid_to_username_mapping(uid)
-                .map(Into::into)
-                .unwrap_or_else(|_| "N/A".into()),
         },
         PrevProcDetails { start_time: Some(stat.starttime), cpu_time: new_process_times, io },
     ))
@@ -220,7 +209,6 @@ pub fn get_process_data(
     use_current_cpu_total: bool,
     normalization: CpuUsageStrategy,
     now: Instant,
-    user_table: &mut UserTable,
 ) -> crate::utils::error::Result<Vec<ProcessHarvest>> {
     // Commit aggregate CPU baselines only after a successful process enumeration.
     let mut next_idle = *prev_idle;
@@ -255,7 +243,6 @@ pub fn get_process_data(
                             cpu_fraction,
                             use_current_cpu_total,
                             now,
-                            user_table,
                         ) {
                             *prev_proc_details = new_details;
 
@@ -329,10 +316,7 @@ mod tests {
             std::fs::write(
                 path.join("stat"), format!("42 ({name}) {}\n", fields.join(" ")),
             ).unwrap();
-            std::fs::write(path.join("io"), concat!(
-                "rchar: 0\nwchar: 0\nsyscr: 0\nsyscw: 0\n",
-                "read_bytes: 5000\nwrite_bytes: 10000\ncancelled_write_bytes: 0\n",
-            )).unwrap();
+            fixture.set_io(5000, 10000);
             if let Some(command) = command {
                 std::fs::write(path.join("cmdline"), command).unwrap();
             }
@@ -341,6 +325,12 @@ mod tests {
 
         fn process(&self) -> Process {
             Process::new_with_root(self.0.join("42")).unwrap()
+        }
+
+        fn set_io(&self, read: u64, write: u64) {
+            std::fs::write(self.0.join("42/io"), format!(
+                "rchar: 0\nwchar: 0\nsyscr: 0\nsyscw: 0\nread_bytes: {read}\nwrite_bytes: {write}\ncancelled_write_bytes: 0\n",
+            )).unwrap();
         }
     }
 
@@ -356,14 +346,13 @@ mod tests {
             "very-long-proce", Some(b"/usr/bin/very-long-process\0--flag\0"),
         );
         let process = fixture.process();
-        let mut users = UserTable::default();
-        users.uid_user_mapping.insert(process.uid().unwrap(), "fixture".into());
         let then = Instant::now();
+        let now = then + Duration::from_secs(2);
         let previous = PrevProcDetails {
             start_time: Some(100), cpu_time: 100, io: Some((1000, 2000, then)),
         };
         let (sample, baseline) = read_proc(
-            &previous, &process, 200.0, 0.5, false, then + Duration::from_secs(2), &mut users,
+            &previous, &process, 200.0, 0.5, false, now,
         ).unwrap();
         assert_eq!(sample.pid, 42);
         assert_eq!(sample.name, "very-long-process");
@@ -373,14 +362,29 @@ mod tests {
         assert_eq!(
             (sample.read_bytes_per_sec, sample.write_bytes_per_sec), (2000, 4000),
         );
-        assert_eq!((sample.total_read_bytes, sample.total_write_bytes), (5000, 10000));
+        assert_eq!(sample.process_state.1, 'R');
+        assert_eq!(baseline.io, Some((5000, 10000, now)));
         assert_eq!(baseline.cpu_time, 150);
         assert_eq!(baseline.start_time, Some(100));
         let json = serde_json::to_value(&sample).unwrap();
         assert!(json.get("parent_pid").is_none());
         assert!(json.get("mem_usage_percent").is_none());
+        for field in ["uid", "user", "total_read_bytes", "total_write_bytes"] {
+            assert!(json.get(field).is_none(), "unexpected transport field: {field}");
+        }
         assert_eq!(json["mem_usage_bytes"], sample.mem_usage_bytes);
         assert_eq!(json["cpu_usage_percent"], 12.5);
+
+        // Cumulative counters remain internal and drive the next sample's rates.
+        fixture.set_io(5500, 11500);
+        let next = now + Duration::from_millis(500);
+        let (sample, baseline) = read_proc(
+            &baseline, &process, 200.0, 0.5, false, next,
+        ).unwrap();
+        assert_eq!(
+            (sample.read_bytes_per_sec, sample.write_bytes_per_sec), (1000, 3000),
+        );
+        assert_eq!(baseline.io, Some((5500, 11500, next)));
     }
 
     #[test]
@@ -388,10 +392,8 @@ mod tests {
         for (command, expected) in [(None, "worker"), (Some(b"".as_slice()), "[worker]")] {
             let fixture = ProcFixture::new("worker", command);
             let process = fixture.process();
-            let mut users = UserTable::default();
-            users.uid_user_mapping.insert(process.uid().unwrap(), "fixture".into());
             let (sample, _) = read_proc(
-                &PrevProcDetails::default(), &process, 200.0, 0.5, false, Instant::now(), &mut users,
+                &PrevProcDetails::default(), &process, 200.0, 0.5, false, Instant::now(),
             ).unwrap();
             assert_eq!(sample.name, "worker");
             assert_eq!(sample.command, expected);

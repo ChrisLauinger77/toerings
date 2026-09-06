@@ -130,6 +130,61 @@ mod tests {
     use super::*;
 
     #[test]
+    fn snapshot_serializes_displayed_values_and_freshness_without_unused_telemetry() {
+        use crate::data_harvester::{
+            cpu::{CpuData, CpuDataType},
+            memory::MemHarvest,
+            network::NetworkHarvest,
+            processes::ProcessHarvest,
+        };
+        let snapshot = Snapshot {
+            data: Data {
+                cpu: Some(vec![CpuData { data_type: CpuDataType::Cpu(0), cpu_usage: 25.0 }]),
+                memory: Some(MemHarvest {
+                    mem_total_in_kib: 1024, mem_used_in_kib: 512, use_percent: Some(50.0),
+                }),
+                network: Some(NetworkHarvest { rx: 1000, tx: 2000 }),
+                list_of_processes: Some(vec![ProcessHarvest {
+                    pid: 42,
+                    name: "worker".into(),
+                    command: "/usr/bin/worker --flag".into(),
+                    cpu_usage_percent: 12.5,
+                    mem_usage_bytes: 4096,
+                    read_bytes_per_sec: 100,
+                    write_bytes_per_sec: 200,
+                    process_state: ("Running".into(), 'R'),
+                }]),
+                uptime: Duration::from_secs(3600),
+                ..Data::default()
+            },
+            sequence: 7,
+            age_ms: 1250,
+            failed: false,
+        };
+        let json = serde_json::to_value(snapshot).unwrap();
+        assert_eq!(json["sequence"], 7);
+        assert_eq!(json["age_ms"], 1250);
+        assert_eq!(json["failed"], false);
+        assert_eq!(json["uptime"], "1h");
+        assert_eq!(json["cpu"][0]["cpu_usage"], 25.0);
+        assert_eq!(json["memory"]["mem_used_in_kib"], 512);
+        assert_eq!(json["network"], serde_json::json!({"rx": 1000, "tx": 2000}));
+        assert_eq!(json["list_of_processes"][0], serde_json::json!({
+            "pid": 42,
+            "name": "worker",
+            "command": "/usr/bin/worker --flag",
+            "cpu_usage_percent": 12.5,
+            "mem_usage_bytes": 4096,
+            "read_bytes_per_sec": 100,
+            "write_bytes_per_sec": 200,
+            "process_state": ["Running", "R"],
+        }));
+        for field in ["last_collection_time", "load_avg", "io"] {
+            assert!(json.get(field).is_none(), "unexpected transport field: {field}");
+        }
+    }
+
+    #[test]
     fn blocked_initialization_and_first_sample_keep_startup_age_until_publication() {
         let (entered, entry) = mpsc::channel();
         let (release, blocked) = mpsc::channel();

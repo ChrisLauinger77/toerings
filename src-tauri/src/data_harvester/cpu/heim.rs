@@ -11,13 +11,6 @@ cfg_if::cfg_if! {
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(target_family = "unix")] {
-        pub mod unix;
-        pub use unix::*;
-    }
-}
-
 use std::collections::VecDeque;
 
 use futures::StreamExt;
