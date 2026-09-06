@@ -4947,6 +4947,7 @@ dependencies = [
  "time",
  "winapi",
  "windows 0.62.2",
+ "x11",
 ]
 
 [[package]]

@@ -22,7 +22,12 @@ runner_temp=${RUNNER_TEMP:?RUNNER_TEMP must point to the CI temporary directory}
 rpm_database=$(mktemp -d "$runner_temp/toerings-rpmdb.XXXXXX")
 deb_check=$(mktemp -d "$runner_temp/toerings-deb.XXXXXX")
 appimage_check=$(mktemp -d "$runner_temp/toerings-appimage.XXXXXX")
-trap 'rm -rf "$rpm_database" "$deb_check" "$appimage_check"' EXIT
+x11_guard=$(mktemp "$runner_temp/toerings-x11-guard.XXXXXX.so")
+trap 'rm -rf "$rpm_database" "$deb_check" "$appimage_check" "$x11_guard"' EXIT
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+cc -std=c11 -Wall -Wextra -Werror -shared -fPIC \
+  "$script_dir/../tests/native/x11-thread-guard.c" -o "$x11_guard" -ldl
 
 deb_description=$(dpkg-deb -f "$deb_path" Description)
 test -n "$deb_description" && test "$deb_description" != "(none)"
@@ -50,27 +55,32 @@ test -f "$deb_check/usr/share/icons/hicolor/256x256/apps/ToeRings.png"
 )
 
 bundle_dir=$(dirname "$(dirname "$rpm_path")")
-docker run --rm --volume "$bundle_dir:/packages:ro" ubuntu:22.04 bash -c '
+docker run --rm --volume "$bundle_dir:/packages:ro" \
+  --volume "$x11_guard:/x11-thread-guard.so:ro" ubuntu:22.04 bash -c '
   set -euo pipefail
   apt-get update
   DEBIAN_FRONTEND=noninteractive apt-get install -y /packages/deb/*.deb
   DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb
   set +e
-  timeout 10s xvfb-run -a /usr/bin/ToeRings >/tmp/deb-smoke.log 2>&1
+  timeout 10s xvfb-run -a env LD_PRELOAD=/x11-thread-guard.so \
+    /usr/bin/ToeRings >/tmp/deb-smoke.log 2>&1
   deb_status=$?
   set -e
   cat /tmp/deb-smoke.log
   test "$deb_status" -eq 124
+  grep -Fx "ToeRings X11 startup ordering verified" /tmp/deb-smoke.log
 '
 
 set +e
-timeout 10s env APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a "$appimage_path" \
+timeout 10s xvfb-run -a env APPIMAGE_EXTRACT_AND_RUN=1 \
+  LD_PRELOAD="$x11_guard${LD_PRELOAD:+:$LD_PRELOAD}" "$appimage_path" \
   >"$runner_temp/appimage-smoke.log" 2>&1
 appimage_status=$?
 set -e
 
 cat "$runner_temp/appimage-smoke.log"
 test "$appimage_status" -eq 124
+grep -Fx "ToeRings X11 startup ordering verified" "$runner_temp/appimage-smoke.log"
 ! grep -F "Could not create default EGL display" "$runner_temp/appimage-smoke.log"
 
 docker run --rm --volume "$bundle_dir:/packages:ro" fedora:latest \

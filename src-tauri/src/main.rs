@@ -177,6 +177,13 @@ fn set_menu_locale(_app: tauri::AppHandle, _locale: String) -> Result<(), String
 }
 
 fn main() {
+    #[cfg(target_os = "linux")]
+    {
+        // SAFETY: Xlib requires this before any other Xlib call. Run it on the
+        // main thread before Tauri/GTK initialization or starting any workers.
+        // This initializes locking only; it does not open or select a display.
+        assert_ne!(unsafe { x11::xlib::XInitThreads() }, 0, "failed to initialize Xlib threading");
+    }
     let sampler = Sampler::start().expect("failed to start telemetry worker");
     let builder = tauri::Builder::default().manage(sampler);
 

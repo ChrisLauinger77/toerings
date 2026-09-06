@@ -31,7 +31,7 @@ All findings below were confirmed in the current source. Confidence in the failu
 
 ## Validation performed locally
 
-The final frontend checks were repeated after verifying that installed package versions match `package-lock.json` (including Svelte 5.57.0 and Vite 8.2.2). A separate clean `npm ci --offline` attempt in a temporary directory initially lacked cached packages; a retry reached esbuild's installation check but was denied subprocess execution (`EPERM`). No clean installation success is claimed. The repository lockfiles remain unchanged, and CI must repeat installation with `npm ci`.
+The final frontend checks were repeated after verifying that installed package versions match `package-lock.json` (including Svelte 5.57.0 and Vite 8.2.2). A separate clean `npm ci --offline` attempt in a temporary directory initially lacked cached packages; a retry reached esbuild's installation check but was denied subprocess execution (`EPERM`). No clean local installation success is claimed. CI repeats installation with `npm ci`.
 
 - `npm run check`: zero errors and warnings.
 - `npm run lint`: passes.
@@ -39,8 +39,14 @@ The final frontend checks were repeated after verifying that installed package v
 - `npm run build`: passes; the manual browser fixture also builds with the existing Vite configuration.
 - Seven isolated Rust tests pass: fractional rate calculation, `ps` row parsing, two subprocess capture/timeout tests, and three Linux sensor fixture tests. The sensor modules were copied unchanged to a temporary test harness using cached serde/anyhow/cfg-if libraries.
 - The Linux collector, sampler, and their unit-test sources type-check in an isolated temporary harness against cached dependency metadata. This excludes Tauri startup and external-IP integration and is supplementary evidence, not a locked application build.
-- `cargo check --locked --offline` cannot resolve the locked `log 0.4.34` from this machine's cache. The normal network attempt cannot resolve crates.io. A full Cargo test run, Tauri build, and bundle validation have therefore not passed locally. The sampler regression added after review covers blocked initialization, blocked first collection, and age reset on publication; its targeted Cargo run encountered the same dependency/network limits.
+- Initial Cargo attempts were blocked by a missing cached `log 0.4.34` and crates.io DNS failures. With the dependencies subsequently available, `cargo test --locked --offline --manifest-path src-tauri/Cargo.toml` passes all 20 Linux tests, including blocked initialization, blocked first collection, and age reset on publication. A full Tauri bundle build and GUI validation have not passed locally.
 - The local browser server is unavailable under the current execution permissions. The browser fixture has build validation but no claimed visual/runtime result.
+
+## Linux X11 startup follow-up
+
+[CI on commit `9b3cff9`](https://github.com/ChrisLauinger77/toerings/actions/runs/34013167944) passed native tests on every platform but the installed Debian package aborted under Xvfb with an XCB threading assertion. Startup now calls `XInitThreads` before Tauri/GTK initialization and worker creation, checking its return value. The Linux dependency uses the same `x11` version already present in the Cargo lockfile. This initializes Xlib locking without selecting a graphics backend or opening a display.
+
+The Debian and AppImage smoke tests preload `tests/native/x11-thread-guard.c` to reject `XOpenDisplay` before successful thread initialization, and require an explicit verification marker as well as the existing ten-second survival check. The guard only monitors the `ToeRings` executable; inherited use in WebKit subprocesses is ignored. Local controlled probes cover missing, failed, and successful initialization and subprocess exclusion. The unchanged Rust initialization block also compiles, links, and runs against host Xlib. Docker and Xvfb are unavailable locally, so the updated packaged startup checks still require CI.
 
 ## Required platform validation
 
