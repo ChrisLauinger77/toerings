@@ -2,6 +2,9 @@
 
 use crate::data_harvester::memory::{MemCollect, MemHarvest};
 
+#[cfg(any(target_os = "linux", test))]
+mod linux;
+
 pub async fn get_mem_data() -> MemCollect {
     MemCollect {
         ram: get_ram_data().await,
@@ -17,71 +20,7 @@ pub async fn get_ram_data() -> crate::utils::error::Result<Option<MemHarvest>> {
     let (mem_total_in_kib, mem_used_in_kib) = {
         #[cfg(target_os = "linux")]
         {
-            // TODO: [OPT] is this efficient?
-            use smol::fs::read_to_string;
-            let meminfo = read_to_string("/proc/meminfo").await?;
-
-            // All values are in KiB by default.
-            let mut mem_total = 0;
-            let mut cached = 0;
-            let mut s_reclaimable = 0;
-            let mut shmem = 0;
-            let mut buffers = 0;
-            let mut mem_free = 0;
-
-            let mut keys_read: u8 = 0;
-            const TOTAL_KEYS_NEEDED: u8 = 6;
-
-            for line in meminfo.lines() {
-                if let Some((label, value)) = line.split_once(':') {
-                    let to_write = match label {
-                        "MemTotal" => &mut mem_total,
-                        "MemFree" => &mut mem_free,
-                        "Buffers" => &mut buffers,
-                        "Cached" => &mut cached,
-                        "Shmem" => &mut shmem,
-                        "SReclaimable" => &mut s_reclaimable,
-                        _ => {
-                            continue;
-                        }
-                    };
-
-                    if let Some((number, _unit)) = value.trim_start().split_once(' ') {
-                        // Parse the value, remember it's in KiB!
-                        if let Ok(number) = number.parse::<u64>() {
-                            *to_write = number;
-
-                            // We only need a few keys, so we can bail early.
-                            keys_read += 1;
-                            if keys_read == TOTAL_KEYS_NEEDED {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Let's preface this by saying that memory usage calculations are... not straightforward.
-            // There are conflicting implementations everywhere.
-            //
-            // Now that we've added this preface (mainly for future reference), the current implementation below for usage
-            // is based on htop's calculation formula. See
-            // https://github.com/htop-dev/htop/blob/976c6123f41492aaf613b9d172eef1842fb7b0a3/linux/LinuxProcessList.c#L1584
-            // for implementation details as of writing.
-            //
-            // Another implementation, commonly used in other things, is to skip the shmem part of the calculation,
-            // which matches gopsutil and stuff like free.
-
-            let total = mem_total;
-            let cached_mem = cached + s_reclaimable - shmem;
-            let used_diff = mem_free + cached_mem + buffers;
-            let used = if total >= used_diff {
-                total - used_diff
-            } else {
-                total - mem_free
-            };
-
-            (total, used)
+            linux::read_meminfo(std::path::Path::new("/proc/meminfo")).await?
         }
         #[cfg(target_os = "macos")]
         {

@@ -48,6 +48,18 @@ The final frontend checks were repeated after verifying that installed package v
 
 The Debian and AppImage smoke tests preload `tests/native/x11-thread-guard.c` to reject `XOpenDisplay` before successful thread initialization, and require an explicit verification marker as well as the existing ten-second survival check. The guard only monitors the `ToeRings` executable; inherited use in WebKit subprocesses is ignored. Local controlled probes cover missing, failed, and successful initialization and subprocess exclusion. The unchanged Rust initialization block also compiles, links, and runs against host Xlib. Docker and Xvfb are unavailable locally, so the updated packaged startup checks still require CI.
 
+## Second pass: Unix collector inputs
+
+This pass is limited to Linux RAM input validation and Unix username lookup. Before changing the RAM parser, a temporary harness running the original parser confirmed that empty input returned `(0, 0)` and inconsistent cache counters caused subtraction overflow in a debug build. Inspection of the Unix lookup confirmed its use of `getpwuid` shared static storage; a concurrent corruption was not reproduced.
+
+- Linux RAM parsing now requires all six distinct counters with numeric values and `kB` units. Missing, duplicate, malformed, zero-total, or arithmetically inconsistent samples return an error. Checked arithmetic preserves the existing cache formula and the `total - free` fallback when unused memory exceeds total. The existing collector error path leaves RAM unavailable for that sample and retries on the next collection.
+- Unix username lookup now uses `getpwuid_r` with a caller-owned record and buffer, copying the UTF-8 name before releasing storage. Only `ERANGE` retries within a lookup, growing from 1 KiB to a 1 MiB limit. Successful names retain the existing cache behavior; missing or failed lookups remain uncached and use the existing `N/A` fallback in process collection.
+- Six RAM regressions cover valid accounting, field order and whitespace, missing/duplicate/malformed input, overflow/underflow, and successful reads after invalid or missing files. Four username regressions cover buffer growth, cache ownership, uncached failures and recovery, bounded retries, and a real libc lookup with buffer reuse.
+
+Local Linux validation: `cargo test --locked --offline --manifest-path src-tauri/Cargo.toml` passes all 30 tests; `cargo check --locked --offline --manifest-path src-tauri/Cargo.toml`, `npm test` (16 tests), and `npm run build` pass. Cargo reports only the existing unused error-variant and logger warnings. The existing CI matrix runs these new Rust tests without workflow changes: pure RAM parser tests on all hosts, filesystem recovery on Linux, and username tests on Unix hosts. Native macOS lookup and cross-platform bundle validation remain pending CI; no remote workflow or release was started for this pass.
+
+This change bounds lookup buffer growth, not the duration of an individual OS/NSS call. Blocking name services, process-memory total-cache recovery, locale synchronization, diagnostics, and broader collector cleanup remain outside this scope. No product or UX semantics were changed.
+
 ## Required platform validation
 
 1. Run the updated build matrix on Linux x86_64, macOS arm64 and Universal, and Windows x64. It must pass the complete locked Cargo tests and bundle/signature checks before release. No remote workflow was dispatched as part of this change.
