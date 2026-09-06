@@ -12,7 +12,6 @@ pub fn get_process_data<F>(
     sys: &System,
     use_current_cpu_total: bool,
     unnormalized_cpu: bool,
-    mem_total_kb: u64,
     elapsed: std::time::Duration,
     user_table: &mut UserTable,
     backup_cpu_proc_usage: F,
@@ -83,26 +82,8 @@ where
         let pid = process_val.pid().as_u32() as Pid;
         process_vector.push(ProcessHarvest {
             pid,
-            parent_pid: {
-                #[cfg(target_os = "macos")]
-                {
-                    process_val
-                        .parent()
-                        .map(|p| p.as_u32() as _)
-                        .or_else(|| super::fallback_macos_ppid(pid))
-                }
-                #[cfg(not(target_os = "macos"))]
-                {
-                    process_val.parent().map(|p| p.as_u32() as _)
-                }
-            },
             name,
             command,
-            mem_usage_percent: if mem_total_kb > 0 {
-                process_val.memory() as f64 * 100.0 / mem_total_kb as f64
-            } else {
-                0.0
-            },
             mem_usage_bytes: process_val.memory(),
             cpu_usage_percent: process_cpu_usage,
             read_bytes_per_sec: super::super::rates::bytes_per_second(disk_usage.read_bytes, elapsed),

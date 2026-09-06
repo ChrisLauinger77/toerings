@@ -1,16 +1,14 @@
-//! Process data collection for macOS.  Uses sysinfo and custom bindings.
+//! Process data collection for macOS. Uses sysinfo with a ps CPU fallback.
 
 use sysinfo::System;
 
 use super::ProcessHarvest;
 use crate::{data_harvester::processes::UserTable, Pid};
-mod sysctl_bindings;
 
 pub fn get_process_data(
     sys: &System,
     use_current_cpu_total: bool,
     unnormalized_cpu: bool,
-    mem_total_kb: u64,
     elapsed: std::time::Duration,
     user_table: &mut UserTable,
 ) -> crate::utils::error::Result<Vec<ProcessHarvest>> {
@@ -18,17 +16,10 @@ pub fn get_process_data(
         sys,
         use_current_cpu_total,
         unnormalized_cpu,
-        mem_total_kb,
         elapsed,
         user_table,
         get_macos_process_cpu_usage,
     )
-}
-
-pub(crate) fn fallback_macos_ppid(pid: Pid) -> Option<Pid> {
-    sysctl_bindings::kinfo_process(pid)
-        .map(|kinfo| kinfo.kp_eproc.e_ppid)
-        .ok()
 }
 
 fn get_macos_process_cpu_usage(
@@ -44,4 +35,18 @@ fn get_macos_process_cpu_usage(
         1024 * 1024,
     )?;
     Ok(super::ps::parse_cpu_usage(&String::from_utf8_lossy(&output)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::get_macos_process_cpu_usage;
+
+    #[test]
+    fn ps_cpu_fallback_still_reads_a_running_process() {
+        assert!(get_macos_process_cpu_usage(&[]).unwrap().is_empty());
+        let pid = std::process::id() as crate::Pid;
+        let usage = get_macos_process_cpu_usage(&[pid]).unwrap();
+        let cpu = usage.get(&pid).expect("ps must return the running test process");
+        assert!(cpu.is_finite() && *cpu >= 0.0);
+    }
 }

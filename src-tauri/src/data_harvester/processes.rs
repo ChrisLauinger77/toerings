@@ -37,14 +37,8 @@ pub struct ProcessHarvest {
     /// The pid of the process.
     pub pid: Pid,
 
-    /// The parent PID of the process. Remember, parent_pid 0 is root.
-    pub parent_pid: Option<Pid>,
-
     /// CPU usage as a percentage.
     pub cpu_usage_percent: f64,
-
-    /// Memory usage as a percentage.
-    pub mem_usage_percent: f64,
 
     /// Memory usage as bytes.
     pub mem_usage_bytes: u64,

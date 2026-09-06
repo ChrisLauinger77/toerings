@@ -48,7 +48,6 @@ smol = "2.0.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 heim = { git = "https://github.com/heim-rs/heim", features = ["cpu", "disk", "memory", "net"] }
-mach2 = "0.7.0"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 heim = { git = "https://github.com/heim-rs/heim", features = ["disk", "memory"] }
