@@ -1,6 +1,6 @@
 <script lang="ts">
   export let title: string
-  export let plotDatas: Array<{ x: Array<number>; y: Array<number> }>
+  export let plotDatas: Array<{ x: Array<number>; y: Array<number | null> }>
   export let processList: Array<Process>
 
   import type { Colord } from "colord"

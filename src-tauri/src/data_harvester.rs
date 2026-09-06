@@ -31,6 +31,7 @@ pub mod disks;
 pub mod memory;
 pub mod network;
 pub mod processes;
+pub mod rates;
 pub mod temperature;
 
 #[derive(Clone, Debug, Serialize)]
@@ -102,9 +103,9 @@ impl Data {
         self.cpu = None;
         self.load_avg = None;
 
-        if let Some(network) = &mut self.network {
-            network.first_run_cleanup();
-        }
+        self.network = None;
+        #[cfg(feature = "battery")]
+        { self.list_of_batteries = None; }
         #[cfg(feature = "zfs")]
         {
             self.arc = None;
@@ -137,8 +138,7 @@ pub struct DataCollector {
     use_current_cpu_total: bool,
     unnormalized_cpu: bool,
     last_collection_time: Instant,
-    total_rx: u64,
-    total_tx: u64,
+    network_history: network::NetworkHistory,
     show_average_cpu: bool,
     #[cfg(feature = "battery")]
     battery_manager: Option<Manager>,
@@ -173,8 +173,7 @@ impl DataCollector {
             use_current_cpu_total: false,
             unnormalized_cpu: false,
             last_collection_time: Instant::now(),
-            total_rx: 0,
-            total_tx: 0,
+            network_history: network::NetworkHistory::default(),
             show_average_cpu: false,
             #[cfg(feature = "battery")]
             battery_manager: None,
@@ -228,6 +227,8 @@ impl DataCollector {
     }
 
     pub async fn update_data(&mut self) {
+        // A failed source is unavailable for this sample, never silently stale.
+        self.data.cleanup();
         #[cfg(not(target_os = "linux"))]
         {
             self.sys.refresh_cpu_all();
@@ -319,9 +320,7 @@ impl DataCollector {
                     &mut self.pid_mapping,
                     self.use_current_cpu_total,
                     normalize_cpu,
-                    current_instant
-                        .duration_since(self.last_collection_time)
-                        .as_secs(),
+                    current_instant,
                     self.mem_total_kb,
                     &mut self.user_table,
                 )
@@ -335,6 +334,7 @@ impl DataCollector {
                         self.use_current_cpu_total,
                         self.unnormalized_cpu,
                         self.mem_total_kb,
+                        current_instant.duration_since(self.last_collection_time),
                         &mut self.user_table,
                     )
                 }
@@ -345,6 +345,7 @@ impl DataCollector {
                         self.use_current_cpu_total,
                         self.unnormalized_cpu,
                         self.mem_total_kb,
+                        current_instant.duration_since(self.last_collection_time),
                     )
                 }
             }
@@ -380,19 +381,14 @@ impl DataCollector {
             {
                 network::get_network_data(
                     &self.networks,
-                    self.last_collection_time,
-                    &mut self.total_rx,
-                    &mut self.total_tx,
+                    &mut self.network_history,
                     current_instant,
                 )
             }
             #[cfg(not(any(target_os = "windows", target_os = "freebsd")))]
             {
                 network::get_network_data(
-                    self.last_collection_time,
-                    &mut self.total_rx,
-                    &mut self.total_tx,
-                    current_instant,
+                    &mut self.network_history,
                 )
             }
         };
@@ -417,10 +413,6 @@ impl DataCollector {
         );
 
         if let Ok(net_data) = net_data {
-            if let Some(net_data) = &net_data {
-                self.total_rx = net_data.total_rx;
-                self.total_tx = net_data.total_tx;
-            }
             self.data.network = net_data;
         }
 

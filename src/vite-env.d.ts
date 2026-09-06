@@ -9,8 +9,8 @@ interface CPUData {
 interface Process {
   name: string
   command: string
-  pid: string
-  parent_pid: string | null
+  pid: number
+  parent_pid: number | null
   cpu_usage_percent: number
   mem_usage_percent: number
   mem_usage_bytes: number
@@ -19,8 +19,8 @@ interface Process {
   total_read_bytes: number
   total_write_bytes: number
   process_state: [string, string]
-  uid: string | null
-  user: string | null
+  uid?: number | null
+  user?: string | null
 }
 
 interface DiskData {
@@ -71,23 +71,26 @@ interface IOData {
 }
 
 interface Data {
+  sequence: number
+  age_ms: number
+  failed: boolean
   last_collection_time: number
   uptime: string
   hostname: string | null
   kernel_name: string | null
   kernel_version: string | null
   os_version: string | null
-  list_of_processes: Array<Process>
-  cpu: Array<CPUData>
-  load_avg: Array<number>
-  memory: MemData
-  swap: MemData
-  disks: Array<DiskData>
-  io: Record<string, IOData>
+  list_of_processes: Array<Process> | null
+  cpu: Array<CPUData> | null
+  load_avg: Array<number> | null
+  memory: MemData | null
+  swap: MemData | null
+  disks: Array<DiskData> | null
+  io: Record<string, IOData | null> | null
   local_ip: string | null
-  network: NetData
-  temperature_sensors: Array<TempData>
+  network: NetData | null
+  temperature_sensors: Array<TempData> | null
   list_of_batteries?: Array<BatteryData>
-  arc?: MemData
+  arc?: MemData | null
   gpu?: Array<[string, MemData]>
 }

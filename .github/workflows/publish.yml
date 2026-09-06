@@ -5,6 +5,10 @@ on:
     tags:
       - "v*.*.*"
 
+concurrency:
+  group: "release-${{ github.ref }}"
+  cancel-in-progress: false
+
 jobs:
   create-release:
     permissions:
@@ -14,29 +18,25 @@ jobs:
       release_id: ${{ steps.create-release.outputs.result }}
 
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: create release
         id: create-release
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
+            const { execFileSync } = require("node:child_process")
+            const { validateVersions, ensureDraft } = require("./.github/scripts/release.cjs")
             const tagName = context.ref.replace("refs/tags/", "")
-            const { data } = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: tagName,
-              name: `ToeRings ${tagName}`,
-              body: [
-                "Download the bundle for your platform from the assets below.",
-                "",
-                "Windows releases include an NSIS installer and a portable ZIP for package managers such as Scoop. The Windows binaries are not code-signed, so Microsoft Defender SmartScreen may show a warning.",
-                "",
-                "macOS builds are ad-hoc signed but cannot be notarized without a paid Apple Developer Program membership. On first launch, Control-click ToeRings and choose Open. See the README for additional Gatekeeper instructions."
-              ].join("\n"),
-              draft: true,
-              prerelease: false,
-              generate_release_notes: true
-            })
-            return data.id
+            validateVersions(tagName)
+            const commit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim()
+            const body = [
+              "Download the bundle for your platform from the assets below.",
+              "",
+              "Windows releases include an NSIS installer and a portable ZIP for package managers such as Scoop. The Windows binaries are not code-signed, so Microsoft Defender SmartScreen may show a warning.",
+              "",
+              "macOS builds are ad-hoc signed but cannot be notarized without a paid Apple Developer Program membership. On first launch, Control-click ToeRings and choose Open. See the README for additional Gatekeeper instructions."
+            ].join("\n")
+            return await ensureDraft(github, context.repo, tagName, commit, body)
 
   build-tauri:
     needs: create-release
@@ -81,12 +81,20 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf rpm squashfs-tools xvfb
       - name: install frontend dependencies
         run: npm ci
+      - name: validate frontend
+        run: |
+          npm run check
+          npm run lint
+          npm test
+          npm run build
+      - name: test native collectors and lifecycle
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
       - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
         id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: ${{ matrix.tauri-args }}
+          args: ${{ matrix.tauri-args }} -- --locked
       - name: repack AppImage without host infrastructure libraries
         if: matrix.platform == 'ubuntu-22.04'
         env:
@@ -113,7 +121,7 @@ jobs:
         run: |
           jq -r '.[] | select(endswith(".deb") or endswith(".rpm") or endswith(".AppImage"))' \
             <<< "$ARTIFACT_PATHS" | while read -r artifact_path; do
-              gh release upload "$GITHUB_REF_NAME" "$artifact_path"
+              node scripts/upload-release.mjs "$artifact_path"
             done
       - name: verify macOS app signature
         if: startsWith(matrix.platform, 'macos')
@@ -132,7 +140,7 @@ jobs:
           app_path=$(jq -r '.[] | select(endswith(".app"))' <<< "$ARTIFACT_PATHS" | head -n 1)
           archive_path="$RUNNER_TEMP/ToeRings_${GITHUB_REF_NAME#v}_${{ matrix['archive-arch'] }}.app.zip"
           ditto -c -k --sequesterRsrc --keepParent "$app_path" "$archive_path"
-          gh release upload "$GITHUB_REF_NAME" "$archive_path"
+          node scripts/upload-release.mjs "$archive_path"
       - name: "create portable Windows ZIP"
         if: matrix.platform == 'windows-latest'
         id: portable
@@ -183,9 +191,9 @@ jobs:
               $checksumLine,
               [System.Text.UTF8Encoding]::new($false)
             )
-            gh release upload $env:GITHUB_REF_NAME $installerPath $checksumPath
+            node scripts/upload-release.mjs $installerPath $checksumPath
           }
-          gh release upload $env:GITHUB_REF_NAME $env:PORTABLE_PATH $env:PORTABLE_CHECKSUM_PATH
+          node scripts/upload-release.mjs $env:PORTABLE_PATH $env:PORTABLE_CHECKSUM_PATH
 
   publish-release:
     permissions:
@@ -194,6 +202,7 @@ jobs:
     needs: [create-release, build-tauri]
 
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: publish release
         id: publish-release
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
@@ -201,10 +210,23 @@ jobs:
           release_id: ${{ needs.create-release.outputs.release_id }}
         with:
           script: |
-            github.rest.repos.updateRelease({
+            const { execFileSync } = require("node:child_process")
+            const { validateVersions, assertDraft, assertTag, assertAssets } = require("./.github/scripts/release.cjs")
+            const tag = context.ref.replace("refs/tags/", "")
+            const version = validateVersions(tag)
+            const commit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim()
+            const releaseId = Number(process.env.release_id)
+            const { data } = await github.rest.repos.getRelease({ ...context.repo, release_id: releaseId })
+            assertDraft(data, tag, commit)
+            await assertTag(github, context.repo, tag, commit)
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, {
+              ...context.repo, release_id: releaseId, per_page: 100
+            })
+            assertAssets(assets, version)
+            await github.rest.repos.updateRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              release_id: process.env.release_id,
+              release_id: releaseId,
               draft: false,
               prerelease: false
             })

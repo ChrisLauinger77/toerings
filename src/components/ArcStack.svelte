@@ -7,24 +7,15 @@
     value: number
     max: number
     label?: string
-    tooltip?: string
+    tooltip?: string[]
   }
 
+  import { ringLayout } from "../lib/utils"
   import { styleVars } from "../lib/actions"
   import { arcTrackColor, arcCapColor, foregroundColor } from "../lib/stores"
   import Arc from "./Arc.svelte"
 
-  function computeGap(strokeWidth: number) {
-    if (strokeWidth <= 5) {
-      return 1
-    }
-    if (strokeWidth <= 10) {
-      return 2
-    }
-    return 3
-  }
-  $: gap = computeGap(strokeWidth)
-  $: levelWidth = (strokeWidth + gap) * 2
+  $: layout = ringLayout(size, arcs.length, strokeWidth)
   $: cssVars = {
     size: `${size}px`
   }
@@ -38,8 +29,8 @@
     <div class="arc-wrap">
       <Arc
         {...arc}
-        size={size - levelWidth * i}
-        {strokeWidth}
+        size={size - layout.levelWidth * i}
+        strokeWidth={layout.strokeWidth}
         {strokeColor}
         {capColor}
         {trackColor}

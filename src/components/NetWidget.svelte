@@ -1,5 +1,5 @@
 <script lang="ts">
-  export let networkData: { rx: Array<number>; tx: Array<number> }
+  export let networkData: { rx: Array<number | null>; tx: Array<number | null> }
   export let localIp: string | null = null
   export let externalIp: string | null = null
   export let hostname: string | null
@@ -10,6 +10,9 @@
   import { titleColor, accentColor } from "../lib/stores"
   import ArcWidget from "./ArcWidget.svelte"
   import ArcStack from "./ArcStack.svelte"
+
+  $: rx = networkData.rx.at(-1) ?? null
+  $: tx = networkData.tx.at(-1) ?? null
 
   $: attrs = [
     { key: $t("network.hostname"), value: hostname ?? $t("common.notAvailable") },
@@ -42,11 +45,11 @@
       <div class="plot-container">
         <div use:uPlotAction={inPlotData}></div>
         <p class="caption">
-          {$t("network.down")}: {toMetric(networkData.rx.at(-1) ?? 0)}
+          {$t("network.down")}: {rx === null ? $t("common.notAvailable") : `${toMetric(rx)}/s`}
         </p>
         <div use:uPlotAction={outPlotData}></div>
         <p class="caption">
-          {$t("network.up")}: {toMetric(networkData.tx.at(-1) ?? 0)}
+          {$t("network.up")}: {tx === null ? $t("common.notAvailable") : `${toMetric(tx)}/s`}
         </p>
       </div>
     </div>

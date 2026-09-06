@@ -9,6 +9,7 @@ pub fn get_process_data(
     use_current_cpu_total: bool,
     unnormalized_cpu: bool,
     mem_total_kb: u64,
+    elapsed: std::time::Duration,
 ) -> crate::utils::error::Result<Vec<ProcessHarvest>> {
     let mut process_vector: Vec<ProcessHarvest> = Vec::new();
     let process_hashmap = sys.processes();
@@ -78,8 +79,8 @@ pub fn get_process_data(
             },
             mem_usage_bytes: process_val.memory(),
             cpu_usage_percent: process_cpu_usage,
-            read_bytes_per_sec: disk_usage.read_bytes,
-            write_bytes_per_sec: disk_usage.written_bytes,
+            read_bytes_per_sec: super::super::rates::bytes_per_second(disk_usage.read_bytes, elapsed),
+            write_bytes_per_sec: super::super::rates::bytes_per_second(disk_usage.written_bytes, elapsed),
             total_read_bytes: disk_usage.total_read_bytes,
             total_write_bytes: disk_usage.total_written_bytes,
             process_state,

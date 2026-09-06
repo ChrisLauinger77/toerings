@@ -81,3 +81,6 @@ pub struct ProcessHarvest {
     // pub rss_kb: u64,
     // pub virt_kb: u64,
 }
+
+#[cfg(any(test, target_os = "macos"))]
+mod ps;

@@ -1,9 +1,9 @@
 <script lang="ts">
   export let diskData: Array<DiskData>
-  export let ioData: Array<{ read: number; write: number }>
+  export let ioData: Array<{ read: number | null; write: number | null }>
   export let processList: Array<Process>
 
-  import { uniqBy } from "lodash-es"
+  import { uniqueDisks } from "../lib/telemetry"
 
   import { toMetric, calcStrokeWidth } from "../lib/utils"
   import { t } from "../lib/i18n"
@@ -19,10 +19,7 @@
     return filepath.split(/[\\/]/).filter(Boolean).at(-1) ?? filepath
   }
 
-  $: pathSortedDisks = uniqBy(
-    [...diskData].sort((a, b) => a.mount_point.localeCompare(b.mount_point)),
-    disk => `${disk.free_space},${disk.used_space},${disk.total_space}`
-  )
+  $: pathSortedDisks = uniqueDisks(diskData)
 
   $: ioSortedProcesses = [...processList]
     .sort(
@@ -36,23 +33,30 @@
   $: arcs = pathSortedDisks
     .filter(
       (disk): disk is DiskData & { used_space: number; total_space: number } =>
-        disk.used_space !== null && disk.total_space !== null
+        disk.used_space !== null && disk.total_space !== null && disk.total_space > 0
     )
     .slice(0, 4)
     .map(disk => ({
       label: formatPath(disk.mount_point),
       value: disk.used_space,
       max: disk.total_space,
-      tooltip: `${disk.name}<br/>${disk.mount_point}<br/>${(
-        (disk.used_space / disk.total_space) *
-        100
-      ).toFixed(1)}% ${$t("disk.used")}`
+      tooltip: [
+        disk.name,
+        disk.mount_point,
+        `${((disk.used_space / disk.total_space) * 100).toFixed(1)}% ${$t("disk.used")}`
+      ]
     }))
 
   $: latestIo = ioData.at(-1) ?? { read: 0, write: 0 }
   $: attrs = [
-    { key: $t("disk.read"), value: toMetric(latestIo.read) },
-    { key: $t("disk.write"), value: toMetric(latestIo.write) }
+    {
+      key: $t("disk.read"),
+      value: latestIo.read === null ? $t("common.notAvailable") : `${toMetric(latestIo.read)}/s`
+    },
+    {
+      key: $t("disk.write"),
+      value: latestIo.write === null ? $t("common.notAvailable") : `${toMetric(latestIo.write)}/s`
+    }
   ]
 
   $: plotDatas = [

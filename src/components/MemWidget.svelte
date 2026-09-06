@@ -1,8 +1,10 @@
 <script lang="ts">
   export let memData: {
-    ram: { usage: MemData; percentages: Array<number> }
+    ram: { usage: MemData; percentages: Array<number | null> }
     swap: { usage: MemData }
   }
+  export let memoryAvailable = true
+  export let swapAvailable = true
   export let processList: Array<Process>
 
   import { toMetric, calcStrokeWidth } from "../lib/utils"
@@ -23,14 +25,21 @@
       max: memData.swap.usage.mem_total_in_kib,
       label: $t("memory.swap")
     }
-  ]
+  ].filter((_, index) => (index === 0 ? memoryAvailable : swapAvailable))
 
   $: attrs = [
     {
-      key: $t("memory.available"),
-      value: toMetric(memData.ram.usage.mem_total_in_kib * 1024)
+      key: $t("memory.total"),
+      value: memoryAvailable
+        ? toMetric(memData.ram.usage.mem_total_in_kib * 1024)
+        : $t("common.notAvailable")
     },
-    { key: $t("memory.used"), value: toMetric(memData.ram.usage.mem_used_in_kib * 1024) }
+    {
+      key: $t("memory.used"),
+      value: memoryAvailable
+        ? toMetric(memData.ram.usage.mem_used_in_kib * 1024)
+        : $t("common.notAvailable")
+    }
   ]
   $: plotData = {
     x: memData.ram.percentages.map((_, i) => i),

@@ -7,9 +7,10 @@
   export let capColor = "white"
   export let size = 100
   export let label: string | null = null
-  export let tooltip: string | null = null
+  export let tooltip: string[] | null = null
 
   import { styleVars } from "../lib/actions"
+  import TooltipText from "./TooltipText.svelte"
 
   let showTooltip = false
 
@@ -30,7 +31,7 @@
   }
 
   let arcPath = ""
-  $: if (value <= 0) {
+  $: if (!Number.isFinite(value) || !Number.isFinite(max) || value <= 0 || max <= 0) {
     arcPath = ""
     x = zero[0]
     y = zero[1]
@@ -55,7 +56,7 @@
   {#if label}
     {#if showTooltip && tooltip}
       <div class="tooltip">
-        {@html tooltip}
+        <TooltipText lines={tooltip} />
       </div>
     {/if}
     <div

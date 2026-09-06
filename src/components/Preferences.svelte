@@ -232,7 +232,8 @@
 <style>
   aside {
     width: 325px;
-    height: 850px;
+    height: 100%;
+    max-height: 850px;
     overflow-y: auto;
     padding: 22px 18px 28px;
     color: #e8edf5;

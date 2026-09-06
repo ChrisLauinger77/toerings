@@ -47,80 +47,29 @@ pub async fn get_cpu_data_list(
             })
     }
 
-    // Get all CPU times...
-    let cpu_times = heim::cpu::times().await?;
-    futures::pin_mut!(cpu_times);
+    async fn read_cpu_times() -> crate::error::Result<Vec<Option<Point>>> {
+        let cpu_times = heim::cpu::times().await?;
+        Ok(cpu_times
+            .map(|cpu| cpu.ok().map(|cpu| convert_cpu_times(&cpu)))
+            .collect()
+            .await)
+    }
 
-    let mut cpu_deque: VecDeque<CpuData> = if previous_cpu_times.is_empty() {
-        // Must initialize ourselves.  Use a very quick timeout to calculate an initial.
+    let mut current = read_cpu_times().await?;
+    if previous_cpu_times.is_empty() {
+        // Warm up on the worker. Both reads use the same topology-aware path.
+        update_cpu_history(&current, previous_cpu_times);
         futures_timer::Delay::new(std::time::Duration::from_millis(100)).await;
-
-        let second_cpu_times = heim::cpu::times().await?;
-        futures::pin_mut!(second_cpu_times);
-
-        let mut new_cpu_times: Vec<(PastCpuWork, PastCpuTotal)> = Vec::new();
-        let mut cpu_deque: VecDeque<CpuData> = VecDeque::new();
-        let mut collected_zip = cpu_times.zip(second_cpu_times).enumerate(); // Gotta move it here, can't on while line.
-
-        while let Some((itx, (past, present))) = collected_zip.next().await {
-            if let (Ok(past), Ok(present)) = (past, present) {
-                let present_times = convert_cpu_times(&present);
-                new_cpu_times.push(present_times);
-                cpu_deque.push_back(CpuData {
-                    data_type: CpuDataType::Cpu(itx),
-                    cpu_usage: calculate_cpu_usage_percentage(
-                        convert_cpu_times(&past),
-                        present_times,
-                    ),
-                });
-            } else {
-                new_cpu_times.push((0.0, 0.0));
-                cpu_deque.push_back(CpuData {
-                    data_type: CpuDataType::Cpu(itx),
-                    cpu_usage: 0.0,
-                });
-            }
-        }
-
-        *previous_cpu_times = new_cpu_times;
-        cpu_deque
-    } else {
-        let (new_cpu_times, cpu_deque): (Vec<(PastCpuWork, PastCpuTotal)>, VecDeque<CpuData>) =
-            cpu_times
-                .collect::<Vec<_>>()
-                .await
-                .iter()
-                .zip(&*previous_cpu_times)
-                .enumerate()
-                .map(|(itx, (current_cpu, (past_cpu_work, past_cpu_total)))| {
-                    if let Ok(cpu_time) = current_cpu {
-                        let present_times = convert_cpu_times(cpu_time);
-
-                        (
-                            present_times,
-                            CpuData {
-                                data_type: CpuDataType::Cpu(itx),
-                                cpu_usage: calculate_cpu_usage_percentage(
-                                    (*past_cpu_work, *past_cpu_total),
-                                    present_times,
-                                ),
-                            },
-                        )
-                    } else {
-                        (
-                            (*past_cpu_work, *past_cpu_total),
-                            CpuData {
-                                data_type: CpuDataType::Cpu(itx),
-                                cpu_usage: 0.0,
-                            },
-                        )
-                    }
-                })
-                .unzip();
-
-        *previous_cpu_times = new_cpu_times;
-        cpu_deque
-    };
+        current = read_cpu_times().await?;
+    }
+    let mut cpu_deque: VecDeque<CpuData> = update_cpu_history(&current, previous_cpu_times)
+        .into_iter()
+        .enumerate()
+        .map(|(index, cpu_usage)| CpuData {
+            data_type: CpuDataType::Cpu(index),
+            cpu_usage,
+        })
+        .collect();
 
     // Get average CPU if needed... and slap it at the top
     if show_average_cpu {
@@ -153,7 +102,46 @@ pub async fn get_cpu_data_list(
         })
     }
 
-    // Ok(Vec::from(cpu_deque.drain(0..3).collect::<Vec<_>>())) // For artificially limiting the CPU results
-
     Ok(Vec::from(cpu_deque))
+}
+
+// Topology changes invalidate positional baselines. In particular, never zip a
+// newly expanded CPU list against a permanently shortened history vector.
+fn update_cpu_history(current: &[Option<Point>], previous: &mut Vec<Point>) -> Vec<f64> {
+    let topology_changed = current.len() != previous.len();
+    let mut next = Vec::with_capacity(current.len());
+    let usage = current.iter().enumerate().map(|(index, current)| {
+        let past = if topology_changed { None } else { previous.get(index).copied() };
+        let Some(now) = current else {
+            next.push(past.unwrap_or((f64::NAN, f64::NAN)));
+            return 0.0;
+        };
+        next.push(*now);
+        match past {
+            Some(past) if past.0.is_finite() && past.1.is_finite() && now.0 >= past.0 && now.1 > past.1 =>
+                (((now.0 - past.0) / (now.1 - past.1)) * 100.0).clamp(0.0, 100.0),
+            _ => 0.0,
+        }
+    }).collect();
+    *previous = next;
+    usage
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn grows_again_after_cpu_removal_and_rebaselines() {
+        let mut previous = vec![(10.0, 100.0); 4];
+        assert_eq!(update_cpu_history(&[Some((20.0, 200.0)); 2], &mut previous), vec![0.0; 2]);
+        assert_eq!(update_cpu_history(&[Some((30.0, 300.0)); 4], &mut previous), vec![0.0; 4]);
+        assert_eq!(update_cpu_history(&[Some((80.0, 400.0)); 4], &mut previous), vec![50.0; 4]);
+    }
+    #[test]
+    fn missing_cpu_reading_keeps_the_last_valid_counter() {
+        let mut previous = vec![(10.0, 100.0)];
+        assert_eq!(update_cpu_history(&[None], &mut previous), vec![0.0]);
+        assert_eq!(update_cpu_history(&[Some((110.0, 300.0))], &mut previous), vec![50.0]);
+        assert_eq!(update_cpu_history(&[Some((1.0, 5.0))], &mut previous), vec![0.0]);
+    }
 }

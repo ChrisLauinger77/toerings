@@ -1,7 +1,7 @@
 <script lang="ts">
   interface CPUProps {
     perCoreUtil: Array<number>
-    cpuLoads: Array<number>
+    cpuLoads: Array<number | null>
   }
 
   export let cpuData: CPUProps
@@ -36,7 +36,7 @@
       key: $t("cpu.temperature"),
       value: avgDieTemp === undefined ? $t("common.notAvailable") : `${avgDieTemp.toFixed(1)}°C`
     },
-    { key: $t("cpu.load"), value: (cpuData.cpuLoads.at(-1) ?? 0).toFixed(2) }
+    { key: $t("cpu.load"), value: cpuData.cpuLoads.at(-1)?.toFixed(2) ?? $t("common.notAvailable") }
   ]
   $: cpuSortedProcesses = [...processList]
     .sort((a, b) => b.cpu_usage_percent - a.cpu_usage_percent)
