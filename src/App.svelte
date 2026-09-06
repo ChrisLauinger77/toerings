@@ -15,6 +15,7 @@
   import { createWindowGeometry, type Position } from "./lib/windowGeometry"
   import { styleVars } from "./lib/actions"
   import { activeLocale } from "./lib/i18n"
+  import { createMenuLocaleSync } from "./lib/menuLocale"
   import {
     foregroundColor,
     backgroundColor,
@@ -40,14 +41,15 @@
   let preferencesVisible = false
   let preferencesOnLeft = false
   let geometry: ReturnType<typeof createWindowGeometry> | undefined
-  let currentMenuLocale = ""
 
-  $: if ($activeLocale !== currentMenuLocale) {
-    currentMenuLocale = $activeLocale
-    invoke("set_menu_locale", { locale: $activeLocale }).catch(() => {
-      // The web preview has no native menu to update.
-    })
-  }
+  onMount(() => {
+    const menuLocale = createMenuLocaleSync(locale => invoke<void>("set_menu_locale", { locale }))
+    const unsubscribe = activeLocale.subscribe(menuLocale.request)
+    return () => {
+      unsubscribe()
+      menuLocale.dispose()
+    }
+  })
 
   function loadWindowPosition(): PhysicalPosition | null {
     try {

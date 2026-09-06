@@ -6,6 +6,8 @@
 mod data_harvester;
 mod utils;
 mod sampling;
+#[cfg(any(not(target_os = "windows"), test))]
+mod menu_sync;
 
 use std::{net::Ipv4Addr, time::Duration};
 
@@ -163,11 +165,18 @@ fn build_menu<R: tauri::Runtime>(
 
 #[tauri::command]
 #[cfg(not(target_os = "windows"))]
-fn set_menu_locale(app: tauri::AppHandle, locale: String) -> Result<(), String> {
-    let menu = build_menu(&app, &locale).map_err(|error| error.to_string())?;
-    app.set_menu(menu)
-        .map(|_| ())
-        .map_err(|error| error.to_string())
+async fn set_menu_locale(app: tauri::AppHandle, locale: String) -> Result<(), String> {
+    let handle = app.clone();
+    menu_sync::apply_on_main_thread(
+        move |update| app.run_on_main_thread(update).map_err(|error| error.to_string()),
+        move || {
+            // Tauri may enqueue set_menu work when called off the main thread.
+            // On the main thread its nested menu operations complete inline.
+            let menu = build_menu(&handle, &locale).map_err(|error| error.to_string())?;
+            handle.set_menu(menu).map(|_| ()).map_err(|error| error.to_string())
+        },
+    )
+    .await
 }
 
 #[tauri::command]
