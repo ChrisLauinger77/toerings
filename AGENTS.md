@@ -83,9 +83,11 @@ canonical tag `vX.Y.Z`; for example, `create release 0.0.1` creates `v0.0.1`.
    - `npm ci` when dependencies are not already installed from the lockfile
    - `npm run build`
    - `npm run check`, comparing failures with the known baseline
-   - `npm run tauri build`
+   - `cargo test --locked --manifest-path src-tauri/Cargo.toml`
 
-   Do not tag a commit if a new relevant build or type-check failure remains unresolved.
+   Do not run `npm run tauri build` as part of the local release procedure. The publish
+   workflow builds and validates the configured Linux, macOS, and Windows bundles. Do not
+   tag a commit if a new relevant build, type-check, or Rust test failure remains unresolved.
 
 7. Review the complete diff. A routine version-only release should contain only the five
    version files listed above. Include other release changes only when the user explicitly
