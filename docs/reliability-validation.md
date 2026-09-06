@@ -4,7 +4,7 @@ The current repository is the product baseline. These changes preserve the exist
 
 ## Runtime ownership
 
-`Sampler` owns one worker thread, which constructs and exclusively uses `DataCollector` and its mutable baselines. It publishes complete snapshots through a short mutex critical section. The IPC command clones that snapshot; platform collection never runs in the IPC handler. Sequence, age, and failure fields distinguish startup, stale data, and new samples. A collector panic discards the collector and retries with fresh baselines.
+`Sampler` owns one worker thread, which constructs and exclusively uses `DataCollector` and its mutable baselines. It publishes complete snapshots through a short mutex critical section. The IPC command clones that snapshot; platform collection never runs in the IPC handler. Sequence, age, and failure fields distinguish startup, stale data, and new samples. Age starts at sampler creation until the first successful sample, so blocked initialization or first collection becomes stale after five seconds too. A successful publication resets age and clears the stale state. A collector panic discards the collector and retries with fresh baselines.
 
 The Svelte mount owns polling, native listeners, window operations, and external-IP refresh. Polling permits one outstanding request and retries after invocation or processing failures. Unavailable sources produce empty widget inputs and graph gaps. Each chart action destroys its uPlot instance on teardown. Preferences remain in the existing localStorage keys; geometry persists the main panel's anchor independently of which side contains preferences.
 
@@ -35,11 +35,11 @@ The final frontend checks were repeated after verifying that installed package v
 
 - `npm run check`: zero errors and warnings.
 - `npm run lint`: passes.
-- `npm test`: 15 tests pass.
+- `npm test`: 16 tests pass, including the PR follow-up regression for the startup timeout and recovery. The original 15 tests also passed before review.
 - `npm run build`: passes; the manual browser fixture also builds with the existing Vite configuration.
 - Seven isolated Rust tests pass: fractional rate calculation, `ps` row parsing, two subprocess capture/timeout tests, and three Linux sensor fixture tests. The sensor modules were copied unchanged to a temporary test harness using cached serde/anyhow/cfg-if libraries.
 - The Linux collector, sampler, and their unit-test sources type-check in an isolated temporary harness against cached dependency metadata. This excludes Tauri startup and external-IP integration and is supplementary evidence, not a locked application build.
-- `cargo check --locked --offline` cannot resolve the locked `log 0.4.34` from this machine's cache. The normal network attempt cannot resolve crates.io. A full Cargo test run, Tauri build, and bundle validation have therefore not passed locally.
+- `cargo check --locked --offline` cannot resolve the locked `log 0.4.34` from this machine's cache. The normal network attempt cannot resolve crates.io. A full Cargo test run, Tauri build, and bundle validation have therefore not passed locally. The sampler regression added after review covers blocked initialization, blocked first collection, and age reset on publication; its targeted Cargo run encountered the same dependency/network limits.
 - The local browser server is unavailable under the current execution permissions. The browser fixture has build validation but no claimed visual/runtime result.
 
 ## Required platform validation

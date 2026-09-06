@@ -36,6 +36,29 @@ test("unavailable sources produce graph gaps and safe widget inputs", () => {
   assert.equal(collectionStatus({ ...missing, sequence: 0 }), "starting")
 })
 
+test("blocked startup becomes stale after five seconds and recovers on publication", () => {
+  const initial = { ...missing, sequence: 0 }
+  assert.equal(collectionStatus(initial), "starting")
+  assert.equal(collectionStatus({ ...initial, age_ms: 5000 }), "starting")
+  assert.equal(collectionStatus({ ...initial, age_ms: 5001 }), "stale")
+  assert.equal(collectionStatus({ ...initial, failed: true }), "stale")
+  assert.equal(collectionStatus(missing), "partial")
+  const memory = { mem_total_in_kib: 100, mem_used_in_kib: 50, use_percent: 50 }
+  assert.equal(
+    collectionStatus({
+      ...missing,
+      cpu: [],
+      memory,
+      swap: memory,
+      network: { rx: 0, tx: 0, total_rx: 0, total_tx: 0 },
+      list_of_processes: [],
+      temperature_sensors: [],
+      disks: []
+    }),
+    "ready"
+  )
+})
+
 test("all widgets render unavailable telemetry without invalid numbers or exceptions", () => {
   const sample = normalizeData(missing)
   const widgets = [

@@ -15,7 +15,8 @@ pub struct Snapshot {
     #[serde(flatten)]
     pub data: Data,
     pub sequence: u64,
-    pub age_ms: Option<u64>,
+    /// Time since the last successful sample, or startup before the first sample.
+    pub age_ms: u64,
     pub failed: bool,
 }
 
@@ -27,6 +28,7 @@ struct Published {
 }
 
 pub struct Sampler {
+    started_at: Instant,
     published: Arc<Mutex<Published>>,
     stop: mpsc::Sender<()>,
     worker: Option<JoinHandle<()>>,
@@ -50,6 +52,7 @@ impl Sampler {
         F: Fn() -> S + Send + 'static,
         S: FnMut() -> Data,
     {
+        let started_at = Instant::now();
         let published = Arc::new(Mutex::new(Published {
             data: Data::default(),
             sequence: 0,
@@ -95,7 +98,7 @@ impl Sampler {
                     }
                 }
             })?;
-        Ok(Self { published, stop, worker: Some(worker) })
+        Ok(Self { started_at, published, stop, worker: Some(worker) })
     }
 
     pub fn snapshot(&self) -> Snapshot {
@@ -103,7 +106,7 @@ impl Sampler {
         Snapshot {
             data: state.data.clone(),
             sequence: state.sequence,
-            age_ms: state.published_at.map(|time| time.elapsed().as_millis() as u64),
+            age_ms: state.published_at.unwrap_or(self.started_at).elapsed().as_millis() as u64,
             failed: state.failed,
         }
     }
@@ -125,6 +128,48 @@ impl Drop for Sampler {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn blocked_initialization_and_first_sample_keep_startup_age_until_publication() {
+        let (entered, entry) = mpsc::channel();
+        let (release, blocked) = mpsc::channel();
+        let blocked = Arc::new(Mutex::new(blocked));
+        let mut sampler = Sampler::spawn(Duration::from_secs(60), move || {
+            entered.send("init").unwrap();
+            blocked.lock().unwrap().recv().unwrap();
+            let entered = entered.clone();
+            let blocked = Arc::clone(&blocked);
+            move || {
+                entered.send("sample").unwrap();
+                blocked.lock().unwrap().recv().unwrap();
+                Data::default()
+            }
+        }).unwrap();
+        assert_eq!(entry.recv_timeout(Duration::from_secs(2)).unwrap(), "init");
+        // Advance startup age without sleeping through the UI's stale threshold.
+        sampler.started_at = Instant::now() - Duration::from_secs(6);
+        let snapshot = sampler.snapshot();
+        assert_eq!(snapshot.sequence, 0);
+        assert!(snapshot.age_ms >= 6000);
+        assert!(!snapshot.failed);
+
+        release.send(()).unwrap();
+        assert_eq!(entry.recv_timeout(Duration::from_secs(2)).unwrap(), "sample");
+        let snapshot = sampler.snapshot();
+        assert_eq!(snapshot.sequence, 0);
+        assert!(snapshot.age_ms >= 6000);
+        assert!(!snapshot.failed);
+
+        release.send(()).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while sampler.snapshot().sequence == 0 && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(2));
+        }
+        let snapshot = sampler.snapshot();
+        assert_eq!(snapshot.sequence, 1);
+        assert!(snapshot.age_ms < 6000);
+        assert!(!snapshot.failed);
+    }
 
     #[test]
     fn reads_and_shutdown_do_not_wait_for_a_blocked_collector() {

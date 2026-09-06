@@ -34,9 +34,8 @@ export function normalizeData(data: Data) {
 }
 
 export function collectionStatus(data: Data): "starting" | "stale" | "partial" | "ready" {
-  if (data.failed) return "stale"
-  if (data.sequence === 0 || data.age_ms === null) return "starting"
-  if (data.age_ms > 5000) return "stale"
+  if (data.failed || data.age_ms > 5000) return "stale"
+  if (data.sequence === 0) return "starting"
   return [
     data.cpu,
     data.memory,

@@ -72,7 +72,7 @@ interface IOData {
 
 interface Data {
   sequence: number
-  age_ms: number | null
+  age_ms: number
   failed: boolean
   last_collection_time: number
   uptime: string
