@@ -319,7 +319,13 @@
     padding: 10px;
     max-height: 850px;
     overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
     font-family: var(--fontFamily);
     color: var(--foregroundColor);
+  }
+
+  main::-webkit-scrollbar {
+    display: none;
   }
 </style>

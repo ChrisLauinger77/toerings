@@ -126,6 +126,9 @@
     position: absolute;
     bottom: 20px;
     left: calc(var(--size) / 2 + 7px);
+    width: max-content;
+    max-width: 238px;
+    overflow-wrap: anywhere;
     background-color: white;
     color: black;
     padding: 5px 8px;
