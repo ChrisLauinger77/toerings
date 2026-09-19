@@ -2,10 +2,10 @@
 
 A theme-able system monitoring tool.
 
-[![Github Latest Releases](https://img.shields.io/github/downloads/ChrisLauinger77/toerings/latest/total)]()
-[![Version](https://img.shields.io/github/v/release/ChrisLauinger77/toerings)]()
-[![Github All Releases](https://img.shields.io/github/downloads/ChrisLauinger77/toerings/total.svg)]()
-[![license](https://img.shields.io/github/license/ChrisLauinger77/toerings)]()
+[![Desktop checks](https://github.com/ChrisLauinger77/toerings/actions/workflows/build.yml/badge.svg)](https://github.com/ChrisLauinger77/toerings/actions/workflows/build.yml)
+[![Version](https://img.shields.io/github/v/release/ChrisLauinger77/toerings)](<>)
+[![Github All Releases](https://img.shields.io/github/downloads/ChrisLauinger77/toerings/total.svg)](<>)
+[![license](https://img.shields.io/github/license/ChrisLauinger77/toerings)](<>)
 
 ![examples](./public/example-all.png)
 
@@ -80,7 +80,6 @@ scoop install ChrisLauinger77/toerings
 ```
 
 You can also download the NSIS installer or portable ZIP from the GitHub release assets.
-
 
 ## Install from Source
 
