@@ -13,9 +13,28 @@ use std::{net::Ipv4Addr, time::Duration};
 
 use crate::utils::error;
 use sampling::{Sampler, Snapshot};
+#[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+use tauri::menu::AboutMetadata;
 #[cfg(not(target_os = "windows"))]
-use tauri::menu::{AboutMetadata, Menu, MenuItemBuilder, PredefinedMenuItem, Submenu};
+use tauri::menu::{Menu, MenuItemBuilder, PredefinedMenuItem, Submenu};
 use tauri::{Emitter, Manager};
+
+#[cfg(target_os = "macos")]
+use objc2::{rc::Retained, runtime::AnyObject};
+#[cfg(target_os = "macos")]
+use objc2_app_kit::{
+    NSAboutPanelOptionApplicationName, NSAboutPanelOptionApplicationVersion,
+    NSAboutPanelOptionCredits, NSAboutPanelOptionVersion, NSApplication, NSLinkAttributeName,
+};
+#[cfg(target_os = "macos")]
+use objc2_foundation::{
+    MainThreadMarker, NSDictionary, NSMutableAttributedString, NSRange, NSString,
+};
+
+#[cfg(not(target_os = "windows"))]
+const REPOSITORY_URL: &str = "https://github.com/ChrisLauinger77/toerings";
+#[cfg(not(target_os = "windows"))]
+const UPSTREAM_URL: &str = "https://github.com/acarl005/toerings";
 
 #[cfg(target_family = "windows")]
 pub type Pid = usize;
@@ -62,6 +81,7 @@ struct MenuLabels {
     quit: &'static str,
     about: &'static str,
     menu: &'static str,
+    #[cfg(not(target_os = "macos"))]
     forked_from: &'static str,
     repository: &'static str,
     upstream: &'static str,
@@ -77,8 +97,9 @@ fn menu_labels(locale: &str) -> MenuLabels {
             quit: "ToeRings beenden",
             about: "Über ToeRings",
             menu: "Menü",
+            #[cfg(not(target_os = "macos"))]
             forked_from: "Abgespalten von:",
-            repository: "Repository",
+            repository: "GitHub Repository",
             upstream: "Ursprungsprojekt",
         },
         "fr" => MenuLabels {
@@ -88,8 +109,9 @@ fn menu_labels(locale: &str) -> MenuLabels {
             quit: "Quitter ToeRings",
             about: "À propos de ToeRings",
             menu: "Menu",
+            #[cfg(not(target_os = "macos"))]
             forked_from: "Dérivé du projet :",
-            repository: "Dépôt",
+            repository: "GitHub Repository",
             upstream: "Projet d’origine",
         },
         "es" => MenuLabels {
@@ -99,8 +121,9 @@ fn menu_labels(locale: &str) -> MenuLabels {
             quit: "Salir de ToeRings",
             about: "Acerca de ToeRings",
             menu: "Menú",
+            #[cfg(not(target_os = "macos"))]
             forked_from: "Derivado del proyecto:",
-            repository: "Repositorio",
+            repository: "GitHub Repository",
             upstream: "Proyecto original",
         },
         _ => MenuLabels {
@@ -110,8 +133,9 @@ fn menu_labels(locale: &str) -> MenuLabels {
             quit: "Quit ToeRings",
             about: "About ToeRings",
             menu: "Menu",
+            #[cfg(not(target_os = "macos"))]
             forked_from: "Forked from upstream:",
-            repository: "Repository",
+            repository: "GitHub Repository",
             upstream: "Upstream (fork source)",
         },
     }
@@ -131,28 +155,29 @@ fn build_menu<R: tauri::Runtime>(
     let quit = MenuItemBuilder::with_id("quit", labels.quit)
         .accelerator("CmdOrCtrl+Q")
         .build(handle)?;
+    #[cfg(not(target_os = "macos"))]
     let about = PredefinedMenuItem::about(
         handle,
         Some(labels.about),
         Some(AboutMetadata {
             name: Some("ToeRings".to_string()),
             version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            short_version: Some(env!("TOERINGS_GIT_COMMIT").to_string()),
             authors: Some(vec!["ChrisLauinger77".to_string()]),
-            comments: Some(format!(
-                "{}\nhttps://github.com/acarl005/toerings",
-                labels.forked_from
-            )),
+            comments: Some(format!("{}\n{UPSTREAM_URL}", labels.forked_from)),
             license: Some("MIT".to_string()),
-            website: Some("https://github.com/ChrisLauinger77/toerings".to_string()),
-            website_label: Some("github.com/ChrisLauinger77/toerings".to_string()),
+            website: Some(REPOSITORY_URL.to_string()),
+            website_label: Some(labels.repository.to_string()),
             credits: Some(format!(
-                "{}\nhttps://github.com/ChrisLauinger77/toerings\n\n{}\nhttps://github.com/acarl005/toerings",
+                "{}\n{REPOSITORY_URL}\n\n{}\n{UPSTREAM_URL}",
                 labels.repository, labels.upstream
             )),
             icon: handle.default_window_icon().cloned(),
             ..Default::default()
         }),
     )?;
+    #[cfg(target_os = "macos")]
+    let about = MenuItemBuilder::with_id(format!("about-{locale}"), labels.about).build(handle)?;
     let submenu = Submenu::with_items(
         handle,
         labels.menu,
@@ -161,6 +186,52 @@ fn build_menu<R: tauri::Runtime>(
     )?;
 
     Menu::with_items(handle, &[&submenu])
+}
+
+#[cfg(target_os = "macos")]
+fn show_macos_about(locale: &str) {
+    let labels = menu_labels(locale);
+    let credits_text = format!(
+        "{}\n\n{}\n{UPSTREAM_URL}",
+        labels.repository, labels.upstream
+    );
+    let credits = NSMutableAttributedString::from_nsstring(&NSString::from_str(&credits_text));
+    let repository_url = NSString::from_str(REPOSITORY_URL);
+
+    // SAFETY: NSLinkAttributeName accepts an NSString URL, and the range covers the UTF-16
+    // representation of the repository label at the beginning of the credits string.
+    unsafe {
+        credits.addAttribute_value_range(
+            NSLinkAttributeName,
+            &repository_url,
+            NSRange::new(0, labels.repository.encode_utf16().count()),
+        );
+    }
+
+    let keys = vec![
+        unsafe { NSAboutPanelOptionApplicationName },
+        unsafe { NSAboutPanelOptionApplicationVersion },
+        unsafe { NSAboutPanelOptionVersion },
+        unsafe { NSAboutPanelOptionCredits },
+    ];
+    let objects: Vec<Retained<AnyObject>> = vec![
+        Retained::into_super(Retained::into_super(NSString::from_str("ToeRings"))),
+        Retained::into_super(Retained::into_super(NSString::from_str(env!(
+            "CARGO_PKG_VERSION"
+        )))),
+        Retained::into_super(Retained::into_super(NSString::from_str(env!(
+            "TOERINGS_GIT_COMMIT"
+        )))),
+        Retained::into_super(Retained::into_super(Retained::into_super(credits))),
+    ];
+    let options = NSDictionary::from_retained_objects(&keys, &objects);
+    let main_thread = MainThreadMarker::new().expect("menu events must run on the main thread");
+
+    // SAFETY: The dictionary values match the Cocoa types required by each About panel key.
+    unsafe {
+        NSApplication::sharedApplication(main_thread)
+            .orderFrontStandardAboutPanelWithOptions(&options);
+    }
 }
 
 #[tauri::command]
@@ -201,6 +272,10 @@ fn main() {
 
     builder
         .on_menu_event(|app, event| match event.id().as_ref() {
+            #[cfg(target_os = "macos")]
+            id if id.starts_with("about-") => {
+                show_macos_about(id.strip_prefix("about-").unwrap_or("en"));
+            }
             "preferences" => {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.emit("openPreferences", ());
