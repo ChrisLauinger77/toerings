@@ -88,7 +88,7 @@ For manual frontend testing, run `npm run dev` and open `/tests/browser.html?cpu
 
 - CPU normalization and load interpretation, which sensors constitute CPU temperature, sleeping-device zero-temperature aggregation, and whether disk throughput should measure whole devices or observed processes require product decisions.
 - Interface inclusion, the four-disk limit, multiple-instance policy, and appearance storage policy remain unchanged.
-- The CI and release matrix covers Ubuntu 22.04 x86_64, macOS arm64 and a Universal bundle, and Windows x64 with default features. It does not cover FreeBSD, non-default `battery`, `gpu`/`nvidia`, or `zfs` feature combinations, native macOS x86_64 execution, native Wayland sessions, or architectures outside those targets.
+- The CI and release matrix covers Ubuntu 24.04 x86_64, macOS arm64 and a Universal bundle, and Windows x64 with default features. It does not cover FreeBSD, non-default `battery`, `gpu`/`nvidia`, or `zfs` feature combinations, native macOS x86_64 execution, native Wayland sessions, or architectures outside those targets.
 - macOS artifacts are ad-hoc signed but not notarized. Windows artifacts are not code-signed. Those are intentional release-policy limits, not uncompleted reliability validation.
 - There is one collector worker. Rust cannot safely cancel an arbitrary blocked kernel or filesystem read; the UI remains usable, but telemetry cannot resume until that call returns. Independent collector workers or process isolation should be considered only with evidence of a recurring blocked source.
 - The subprocess capture helper is scoped to trusted utilities such as `/bin/ps`. It does not promise process-tree cancellation for arbitrary shell commands whose descendants retain stdout.

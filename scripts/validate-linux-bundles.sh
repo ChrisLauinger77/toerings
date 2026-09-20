@@ -56,7 +56,7 @@ test -f "$deb_check/usr/share/icons/hicolor/256x256/apps/ToeRings.png"
 
 bundle_dir=$(dirname "$(dirname "$rpm_path")")
 docker run --rm --volume "$bundle_dir:/packages:ro" \
-  --volume "$x11_guard:/x11-thread-guard.so:ro" ubuntu:22.04 bash -c '
+  --volume "$x11_guard:/x11-thread-guard.so:ro" ubuntu:24.04 bash -c '
   set -euo pipefail
   apt-get update
   DEBIAN_FRONTEND=noninteractive apt-get install -y /packages/deb/*.deb
