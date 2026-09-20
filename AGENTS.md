@@ -31,6 +31,10 @@ Vite, or TypeScript modernization into Tauri migration or release changes.
 - Linux AppImages must be passed through `scripts/repack-appimage.sh` before distribution;
   this prevents bundled Wayland and GLib infrastructure libraries from conflicting with
   newer host graphics stacks.
+- Prebuilt Linux artifacts target Ubuntu 24.04 and may require glibc 2.39 or newer. Keep the
+  Linux runners in both build workflows and the Ubuntu image in
+  `scripts/validate-linux-bundles.sh` aligned. Changing this baseline changes the minimum
+  supported Linux version and must also be documented in the README.
 - Run `npm run check` when changing frontend code. The repository may contain existing
   diagnostics; distinguish new errors from the established baseline.
 - Linux and macOS CI use stable Rust. Linux builds against WebKitGTK 4.1, the runtime used

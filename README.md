@@ -17,6 +17,7 @@ The name "ToeRings" just sounds like Tauri, and contains the word "rings".
 ## Install on Linux
 
 Download the package for your distribution from the GitHub release assets.
+Prebuilt Linux packages require Ubuntu 24.04 or another distribution with glibc 2.39 or newer.
 
 Debian and Ubuntu:
 
