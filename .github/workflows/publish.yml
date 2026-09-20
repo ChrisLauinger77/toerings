@@ -13,7 +13,7 @@ jobs:
   create-release:
     permissions:
       contents: write
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       release_id: ${{ steps.create-release.outputs.result }}
 
@@ -198,7 +198,7 @@ jobs:
   publish-release:
     permissions:
       contents: write
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [create-release, build-tauri]
 
     steps:
@@ -234,7 +234,7 @@ jobs:
   publish-homebrew:
     permissions:
       contents: read
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: publish-release
 
     steps:
@@ -253,7 +253,7 @@ jobs:
   publish-winget:
     permissions:
       contents: read
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: publish-release
 
     steps:
