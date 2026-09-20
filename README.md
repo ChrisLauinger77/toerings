@@ -17,7 +17,8 @@ The name "ToeRings" just sounds like Tauri, and contains the word "rings".
 ## Install on Linux
 
 Download the package for your distribution from the GitHub release assets.
-Prebuilt Linux packages require Ubuntu 24.04 or another distribution with glibc 2.39 or newer.
+Starting with ToeRings 0.7.0, prebuilt Linux packages require Ubuntu 24.04 or another
+distribution with glibc 2.39 or newer. Ubuntu 22.04 users should stay on ToeRings 0.6.1.
 
 Debian and Ubuntu:
 
