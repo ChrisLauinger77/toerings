@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-22.04
+          - platform: "ubuntu-26.04"
             rust-targets: x86_64-unknown-linux-gnu
             tauri-args: ""
             artifact-name: "toerings-linux-x86_64"
@@ -50,7 +50,7 @@ jobs:
         with:
           targets: ${{ matrix.rust-targets }}
       - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-26.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf rpm squashfs-tools xvfb
@@ -89,7 +89,7 @@ jobs:
           }
           Stop-Process -Id $process.Id -Force
       - name: repack AppImage without host infrastructure libraries
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-26.04'
         env:
           ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
         run: |
@@ -97,7 +97,7 @@ jobs:
           test -n "$appimage_path"
           scripts/repack-appimage.sh "$appimage_path"
       - name: validate Linux bundles
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-26.04'
         env:
           ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
         run: |
