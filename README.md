@@ -6,6 +6,7 @@ A theme-able system monitoring tool.
 [![Version](https://img.shields.io/github/v/release/ChrisLauinger77/toerings)](<>)
 [![Github All Releases](https://img.shields.io/github/downloads/ChrisLauinger77/toerings/total.svg)](<>)
 [![license](https://img.shields.io/github/license/ChrisLauinger77/toerings)](<>)
+![Static Badge](https://img.shields.io/badge/Linux%20%7C%20MacOS%20%7C%20Windows-blue)
 
 ![examples](./public/example-all.png)
 
