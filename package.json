@@ -18,7 +18,7 @@
     "test": "node --import ./tests/register.mjs --test --test-isolation=none --test-timeout=10000 tests/*.test.mjs"
   },
   "dependencies": {
-    "@tauri-apps/api": "2.11.1",
+    "@tauri-apps/api": "2.12.0",
     "lodash-es": "^4.17.21",
     "path-browserify": "^1.0.1",
     "uplot": "^1.6.23"
@@ -26,7 +26,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.0",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
-    "@tauri-apps/cli": "2.11.5",
+    "@tauri-apps/cli": "2.12.0",
     "@tsconfig/svelte": "^5.0.0",
     "@types/lodash-es": "^4.17.6",
     "@types/node": "^24.0.0",

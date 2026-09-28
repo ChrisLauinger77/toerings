@@ -51,7 +51,7 @@ test -f "$deb_check/usr/share/icons/hicolor/256x256/apps/ToeRings.png"
   grep -F 'export LD_PRELOAD="$host_systemd${LD_PRELOAD:+:$LD_PRELOAD}"' "$app_run"
   gtk_hook=squashfs-root/apprun-hooks/linuxdeploy-plugin-gtk.sh
   grep -Fx 'export WEBKIT_DISABLE_COMPOSITING_MODE=1' "$gtk_hook"
-  ! grep -F 'export GDK_BACKEND=x11' "$gtk_hook"
+  ! grep -Eq '^[[:space:]]*export[[:space:]]+GDK_BACKEND=x11([[:space:]]|$)' "$gtk_hook"
 )
 
 bundle_dir=$(dirname "$(dirname "$rpm_path")")
