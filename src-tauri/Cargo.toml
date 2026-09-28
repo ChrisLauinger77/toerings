@@ -28,7 +28,7 @@ thiserror = "2.0.0"
 humantime-serde = "1.1.1"
 local-ip-address = "0.6.0"
 reqwest = "0.13.4"
-starship-battery = { version = "0.11.0", optional = true }
+starship-battery = { version = "0.12.0", optional = true }
 nvml-wrapper = { version = "0.13.0", optional = true }
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.139"
