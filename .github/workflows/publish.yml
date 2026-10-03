@@ -240,7 +240,7 @@ jobs:
     steps:
       - name: "request Homebrew cask update"
         env:
-          HOMEBREW_CASK_DISPATCH_TOKEN: ${{ secrets.HOMEBREW_CASK_DISPATCH_TOKEN }}
+          HOMEBREW_CASK_DISPATCH_TOKEN: ${{ secrets.PACKAGE_REPOSITORIES_TOKEN }}
         run: |
           curl --fail-with-body --silent --show-error \
             --request POST \
