@@ -18,7 +18,7 @@
     "test": "node --import ./tests/register.mjs --test --test-isolation=none --test-timeout=10000 tests/*.test.mjs"
   },
   "dependencies": {
-    "@tauri-apps/api": "2.12.1",
+    "@tauri-apps/api": "2.12.2",
     "lodash-es": "^4.17.21",
     "path-browserify": "^1.0.1",
     "uplot": "^1.6.23"
