@@ -2,7 +2,7 @@
 
 A theme-able system monitoring tool.
 
-[![Desktop checks](https://github.com/ChrisLauinger77/toerings/actions/workflows/build.yml/badge.svg)](https://github.com/ChrisLauinger77/toerings/actions/workflows/build.yml)
+[![CI](https://github.com/ChrisLauinger77/toerings/actions/workflows/ci.yml/badge.svg)](https://github.com/ChrisLauinger77/toerings/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/github/v/release/ChrisLauinger77/toerings)](<>)
 [![Github All Releases](https://img.shields.io/github/downloads/ChrisLauinger77/toerings/total.svg)](<>)
 [![license](https://img.shields.io/github/license/ChrisLauinger77/toerings)](<>)

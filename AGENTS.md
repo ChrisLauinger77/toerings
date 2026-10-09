@@ -10,7 +10,7 @@ frontend through a Tauri command.
 - `src/lib/stores.ts`: persisted color and font preferences.
 - `src-tauri/src/`: Rust application and system-data collectors.
 - `src-tauri/tauri.conf.json`: Tauri 2 application and bundle configuration.
-- `.github/workflows/build.yml`: pull-request and manually dispatched builds for Linux,
+- `.github/workflows/ci.yml`: pull-request and manually dispatched builds for Linux,
   macOS, and Windows.
 - `.github/workflows/publish.yml`: tag-triggered release builds, GitHub publishing, and
   downstream package-manager updates.
@@ -46,7 +46,7 @@ Vite, or TypeScript modernization into Tauri migration or release changes.
 ## Git and GitHub workflow
 
 - Do feature work on a `codex/` branch unless the user specifies another branch.
-- Pull requests run `.github/workflows/build.yml` for Linux x86_64, macOS arm64, macOS
+- Pull requests run `.github/workflows/ci.yml` for Linux x86_64, macOS arm64, macOS
   Universal, and Windows x64 artifacts.
 - Do not push, tag, publish a release, or open a pull request unless the user requests it.
 - A direct request such as `create release 0.0.1` is explicit authorization for the full
