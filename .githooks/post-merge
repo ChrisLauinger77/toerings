@@ -1,8 +1,14 @@
 #!/bin/sh
-# Reinstall npm dependencies when a pull changed package.json or package-lock.json
+# Refresh dependencies when a pull changed npm or Cargo manifests
 changed=$(git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD)
 
 if echo "$changed" | grep -qE '^(package\.json|package-lock\.json)$'; then
   echo "package.json or package-lock.json changed, running npm ci..."
   npm ci
 fi
+
+# Download new crates without compiling; the next build picks them up
+echo "$changed" | grep -E '(^|/)Cargo\.lock$' | while read -r lock; do
+  echo "$lock changed, running cargo fetch..."
+  cargo fetch --locked --manifest-path "$(dirname "$lock")/Cargo.toml"
+done
