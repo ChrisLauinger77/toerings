@@ -1,0 +1,5 @@
+#!/bin/sh
+# Run the post-merge check after `git pull --rebase`; skip `git commit --amend`
+if [ "$1" = "rebase" ]; then
+  exec "$(dirname "$0")/post-merge"
+fi
