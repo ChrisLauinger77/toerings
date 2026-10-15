@@ -3,8 +3,8 @@
 changed=$(git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD)
 
 if echo "$changed" | grep -qE '^(package\.json|package-lock\.json)$'; then
-  echo "package.json or package-lock.json changed, running npm ci..."
-  npm ci
+  echo "package.json or package-lock.json changed, running npm install..."
+  npm install
 fi
 
 # Download new crates without compiling; the next build picks them up
