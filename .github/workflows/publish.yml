@@ -1,47 +1,45 @@
 name: "publish"
 
+# Stage 1 (workflow_dispatch): build, test and package a release candidate. It
+# never creates releases, tags or package-repository updates.
+# Stage 2 (annotated vX.Y.Z tag with a Candidate-Run line): verify that
+# candidate and publish its exact artifact bytes without rebuilding.
 on:
+  workflow_dispatch:
   push:
     tags:
       - "v*.*.*"
+
+permissions:
+  contents: read
 
 concurrency:
   group: "release-${{ github.ref }}"
   cancel-in-progress: false
 
 jobs:
-  create-release:
-    permissions:
-      contents: write
+  validate:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-26.04
     outputs:
-      release_id: ${{ steps.create-release.outputs.result }}
+      version: ${{ steps.version.outputs.result }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: create release
-        id: create-release
+        with:
+          persist-credentials: false
+      - name: validate version sources
+        id: version
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
+          result-encoding: string
           script: |
-            const { execFileSync } = require("node:child_process")
-            const { validateVersions, ensureDraft } = require("./.github/scripts/release.cjs")
-            const tagName = context.ref.replace("refs/tags/", "")
-            validateVersions(tagName)
-            const commit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim()
-            const body = [
-              "Download the bundle for your platform from the assets below.",
-              "",
-              "Windows releases include an NSIS installer and a portable ZIP for package managers such as Scoop. The Windows binaries are not code-signed, so Microsoft Defender SmartScreen may show a warning.",
-              "",
-              "macOS builds are ad-hoc signed but cannot be notarized without a paid Apple Developer Program membership. On first launch, Control-click ToeRings and choose Open. See the README for additional Gatekeeper instructions."
-            ].join("\n")
-            return await ensureDraft(github, context.repo, tagName, commit, body)
+            const { validateVersions } = require("./.github/scripts/release.cjs")
+            const { version } = require("./package.json")
+            return validateVersions(`v${version}`)
 
   build-tauri:
-    needs: create-release
-    permissions:
-      contents: write
+    needs: validate
     strategy:
       fail-fast: false
       matrix:
@@ -50,22 +48,30 @@ jobs:
             rust-targets: x86_64-unknown-linux-gnu
             tauri-args: ""
             archive-arch: ""
+            artifact-name: "packages-linux-x86_64"
           - platform: macos-15
             rust-targets: aarch64-apple-darwin
             tauri-args: "--target aarch64-apple-darwin --bundles app"
             archive-arch: "aarch64"
+            artifact-name: "packages-macos-aarch64"
           - platform: macos-15
             rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
             tauri-args: "--target universal-apple-darwin --bundles app"
             archive-arch: "universal"
+            artifact-name: "packages-macos-universal"
           - platform: "windows-latest"
             rust-targets: "x86_64-pc-windows-msvc"
             tauri-args: "--target x86_64-pc-windows-msvc --bundles nsis"
             archive-arch: ""
+            artifact-name: "packages-windows-x86_64"
 
     runs-on: ${{ matrix.platform }}
+    env:
+      VERSION: ${{ needs.validate.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: setup node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
@@ -91,10 +97,28 @@ jobs:
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml
       - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
         id: tauri
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: ${{ matrix.tauri-args }} -- --locked
+      - name: "smoke-test Windows startup"
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $binaryPath = "src-tauri/target/x86_64-pc-windows-msvc/release/ToeRings.exe"
+          $stdoutPath = Join-Path $env:RUNNER_TEMP "toerings-stdout.log"
+          $stderrPath = Join-Path $env:RUNNER_TEMP "toerings-stderr.log"
+          $process = Start-Process `
+            -FilePath $binaryPath `
+            -PassThru `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath
+          Start-Sleep -Seconds 10
+          if ($process.HasExited) {
+            Write-Host "ToeRings exited with code $($process.ExitCode)"
+            if (Test-Path -LiteralPath $stdoutPath) { Get-Content -LiteralPath $stdoutPath }
+            if (Test-Path -LiteralPath $stderrPath) { Get-Content -LiteralPath $stderrPath }
+            throw "ToeRings did not remain running during the startup smoke test"
+          }
+          Stop-Process -Id $process.Id -Force
       - name: repack AppImage without host infrastructure libraries
         if: matrix.platform == 'ubuntu-24.04'
         env:
@@ -113,15 +137,15 @@ jobs:
           appimage_path=$(jq -r '.[] | select(endswith(".AppImage"))' <<< "$ARTIFACT_PATHS")
           test -n "$deb_path" && test -n "$rpm_path" && test -n "$appimage_path"
           scripts/validate-linux-bundles.sh "$deb_path" "$rpm_path" "$appimage_path"
-      - name: upload Linux bundles
+      - name: stage Linux bundles
         if: matrix.platform == 'ubuntu-24.04'
         env:
           ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          mkdir -p "$RUNNER_TEMP/release"
           jq -r '.[] | select(endswith(".deb") or endswith(".rpm") or endswith(".AppImage"))' \
             <<< "$ARTIFACT_PATHS" | while read -r artifact_path; do
-              node scripts/upload-release.mjs "$artifact_path"
+              cp "$artifact_path" "$RUNNER_TEMP/release/"
             done
       - name: verify macOS app signature
         if: startsWith(matrix.platform, 'macos')
@@ -131,49 +155,32 @@ jobs:
           app_path=$(jq -r '.[] | select(endswith(".app"))' <<< "$ARTIFACT_PATHS" | head -n 1)
           test -n "$app_path"
           codesign --verify --deep --strict --verbose=4 "$app_path"
-      - name: upload macOS app archive
+      - name: stage macOS app archive
         if: startsWith(matrix.platform, 'macos')
         env:
           ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           app_path=$(jq -r '.[] | select(endswith(".app"))' <<< "$ARTIFACT_PATHS" | head -n 1)
-          archive_path="$RUNNER_TEMP/ToeRings_${GITHUB_REF_NAME#v}_${{ matrix['archive-arch'] }}.app.zip"
+          mkdir -p "$RUNNER_TEMP/release"
+          archive_path="$RUNNER_TEMP/release/ToeRings_${VERSION}_${{ matrix['archive-arch'] }}.app.zip"
           ditto -c -k --sequesterRsrc --keepParent "$app_path" "$archive_path"
-          node scripts/upload-release.mjs "$archive_path"
-      - name: "create portable Windows ZIP"
-        if: matrix.platform == 'windows-latest'
-        id: portable
-        shell: pwsh
-        run: |
-          $version = (Get-Content "package.json" | ConvertFrom-Json).version
-          $binaryPath = "src-tauri/target/x86_64-pc-windows-msvc/release/ToeRings.exe"
-          $archivePath = Join-Path $env:RUNNER_TEMP "ToeRings_${version}_windows_x86_64_portable.zip"
-          if (-not (Test-Path -LiteralPath $binaryPath)) {
-            throw "Windows executable not found: $binaryPath"
-          }
-          Compress-Archive -LiteralPath $binaryPath -DestinationPath $archivePath
-          $checksumPath = "$archivePath.sha256"
-          $checksum = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash.ToLowerInvariant()
-          $checksumLine = "$checksum  $([System.IO.Path]::GetFileName($archivePath))`n"
-          [System.IO.File]::WriteAllText(
-            $checksumPath,
-            $checksumLine,
-            [System.Text.UTF8Encoding]::new($false)
-          )
-          "path=$archivePath" >> $env:GITHUB_OUTPUT
-          "checksum-path=$checksumPath" >> $env:GITHUB_OUTPUT
-      - name: "upload Windows release assets"
+      - name: "stage Windows installer and portable ZIP"
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         env:
           ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
-          PORTABLE_PATH: ${{ steps.portable.outputs.path }}
-          PORTABLE_CHECKSUM_PATH: ${{ steps.portable.outputs.checksum-path }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Stop"
-          $PSNativeCommandUseErrorActionPreference = $true
+          $releaseDir = New-Item -ItemType Directory -Force -Path (Join-Path $env:RUNNER_TEMP "release")
+          function Write-Checksum([string] $path) {
+            $checksum = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
+            $checksumLine = "$checksum  $([System.IO.Path]::GetFileName($path))`n"
+            [System.IO.File]::WriteAllText(
+              "$path.sha256",
+              $checksumLine,
+              [System.Text.UTF8Encoding]::new($false)
+            )
+          }
           $installerPaths = @(
             $env:ARTIFACT_PATHS |
               ConvertFrom-Json |
@@ -183,53 +190,143 @@ jobs:
             throw "NSIS installer not found in Tauri artifact paths"
           }
           foreach ($installerPath in $installerPaths) {
-            $checksumPath = "$installerPath.sha256"
-            $checksum = (Get-FileHash -Algorithm SHA256 -LiteralPath $installerPath).Hash.ToLowerInvariant()
-            $checksumLine = "$checksum  $([System.IO.Path]::GetFileName($installerPath))`n"
-            [System.IO.File]::WriteAllText(
-              $checksumPath,
-              $checksumLine,
-              [System.Text.UTF8Encoding]::new($false)
-            )
-            node scripts/upload-release.mjs $installerPath $checksumPath
+            $stagedPath = Join-Path $releaseDir ([System.IO.Path]::GetFileName($installerPath))
+            Copy-Item -LiteralPath $installerPath -Destination $stagedPath
+            Write-Checksum $stagedPath
           }
-          node scripts/upload-release.mjs $env:PORTABLE_PATH $env:PORTABLE_CHECKSUM_PATH
+          $binaryPath = "src-tauri/target/x86_64-pc-windows-msvc/release/ToeRings.exe"
+          $archivePath = Join-Path $releaseDir "ToeRings_$($env:VERSION)_windows_x86_64_portable.zip"
+          if (-not (Test-Path -LiteralPath $binaryPath)) {
+            throw "Windows executable not found: $binaryPath"
+          }
+          Compress-Archive -LiteralPath $binaryPath -DestinationPath $archivePath
+          Write-Checksum $archivePath
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ${{ runner.temp }}/release/*
+          if-no-files-found: error
+          retention-days: 30
 
-  publish-release:
-    permissions:
-      contents: write
+  aggregate:
+    needs: [validate, build-tauri]
     runs-on: ubuntu-26.04
-    needs: [create-release, build-tauri]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: publish release
-        id: publish-release
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: packages-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/release-assets
+      - name: require every release asset and generate SHA256SUMS
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
-          release_id: ${{ needs.create-release.outputs.release_id }}
+          ASSET_DIR: ${{ runner.temp }}/release-assets
+          VERSION: ${{ needs.validate.outputs.version }}
         with:
           script: |
-            const { execFileSync } = require("node:child_process")
-            const { validateVersions, assertDraft, assertTag, assertAssets } = require("./.github/scripts/release.cjs")
+            const { writeChecksums } = require("./.github/scripts/release.cjs")
+            writeChecksums(process.env.ASSET_DIR, process.env.VERSION)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-assets
+          path: ${{ runner.temp }}/release-assets/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: print the commands to publish this candidate
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        with:
+          script: |
+            const { candidateSummary } = require("./.github/scripts/release.cjs")
+            const version = process.env.VERSION
+            if (process.env.GITHUB_RUN_ATTEMPT !== "1") {
+              throw new Error("Reruns cannot be published; start a new manual candidate run")
+            }
+            const branch = context.payload.repository.default_branch
+            if (context.ref !== `refs/heads/${branch}`) {
+              await core.summary
+                .addRaw(`Candidate built from ${context.ref}; only ${branch} can be published.\n`)
+                .write()
+              return
+            }
+            const tagExists = await github.rest.git
+              .getRef({ ...context.repo, ref: `tags/v${version}` })
+              .then(() => true, error => {
+                if (error.status === 404) return false
+                throw error
+              })
+            if (tagExists) {
+              await core.summary
+                .addRaw(`Tag v${version} already exists; bump the version for a new release.\n`)
+                .write()
+              return
+            }
+            const text = candidateSummary({
+              version,
+              commit: context.sha,
+              runId: context.runId,
+              retentionDays: 30
+            })
+            console.log(text)
+            await core.summary.addRaw(text).write()
+
+  publish-release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+      actions: read
+    runs-on: ubuntu-26.04
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: verify annotated tag and candidate run
+        id: candidate
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const { validateVersions, resolveCandidate } = require("./.github/scripts/release.cjs")
             const tag = context.ref.replace("refs/tags/", "")
-            const version = validateVersions(tag)
-            const commit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim()
-            const releaseId = Number(process.env.release_id)
-            const { data } = await github.rest.repos.getRelease({ ...context.repo, release_id: releaseId })
-            assertDraft(data, tag, commit)
-            await assertTag(github, context.repo, tag, commit)
-            const assets = await github.paginate(github.rest.repos.listReleaseAssets, {
-              ...context.repo, release_id: releaseId, per_page: 100
-            })
-            assertAssets(assets, version)
-            await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: releaseId,
-              draft: false,
-              prerelease: false
-            })
+            validateVersions(tag)
+            const branch = context.payload.repository.default_branch
+            const candidate = await resolveCandidate(github, context.repo, tag, branch)
+            if (candidate.commit !== context.sha) {
+              throw new Error("Release tag does not point to the checked-out commit")
+            }
+            core.setOutput("run-id", String(candidate.runId))
+            core.setOutput("artifact-id", String(candidate.artifactId))
+            core.setOutput("commit", candidate.commit)
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.candidate.outputs.artifact-id }}
+          run-id: ${{ steps.candidate.outputs.run-id }}
+          github-token: ${{ github.token }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/candidate
+      - name: verify checksums and publish the candidate assets
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          ASSET_DIR: ${{ runner.temp }}/candidate
+          COMMIT: ${{ steps.candidate.outputs.commit }}
+        with:
+          script: |
+            const { validateVersions, verifyChecksums, publishRelease } = require("./.github/scripts/release.cjs")
+            const tag = context.ref.replace("refs/tags/", "")
+            const files = verifyChecksums(process.env.ASSET_DIR, validateVersions(tag))
+            const body = [
+              "Download the bundle for your platform from the assets below.",
+              "",
+              "Windows releases include an NSIS installer and a portable ZIP for package managers such as Scoop. The Windows binaries are not code-signed, so Microsoft Defender SmartScreen may show a warning.",
+              "",
+              "macOS builds are ad-hoc signed but cannot be notarized without a paid Apple Developer Program membership. On first launch, Control-click ToeRings and choose Open. See the README for additional Gatekeeper instructions."
+            ].join("\n")
+            await publishRelease(github, context.repo, tag, process.env.COMMIT, body, files)
 
   update-package-repositories:
     name: "Request package repository updates"
