@@ -12,8 +12,9 @@ frontend through a Tauri command.
 - `src-tauri/tauri.conf.json`: Tauri 2 application and bundle configuration.
 - `.github/workflows/ci.yml`: pull-request and manually dispatched builds for Linux,
   macOS, and Windows.
-- `.github/workflows/publish.yml`: tag-triggered release builds, GitHub publishing, and
-  downstream package-manager updates.
+- `.github/workflows/publish.yml`: two-stage release. A manual run builds and verifies a
+  release candidate; an annotated version tag publishes that candidate's exact artifacts
+  and requests downstream package-manager updates.
 
 Keep framework and frontend upgrades separate from Tauri maintenance. Do not mix Svelte,
 Vite, or TypeScript modernization into Tauri migration or release changes.
@@ -49,9 +50,10 @@ Vite, or TypeScript modernization into Tauri migration or release changes.
 - Pull requests run `.github/workflows/ci.yml` for Linux x86_64, macOS arm64, macOS
   Universal, and Windows x64 artifacts.
 - Do not push, tag, publish a release, or open a pull request unless the user requests it.
-- A direct request such as `create release 0.0.1` is explicit authorization for the full
-  release procedure below: version edits, verification, commit, tag creation, and pushing
-  the commit and tag.
+- A direct request such as `create release 0.0.1` is explicit authorization for the release
+  procedure below up to the candidate: version edits, verification, commit, pushing the
+  commit, and starting the candidate workflow. Create and push the tag only after the user
+  has tested and approved that candidate.
 - Never create, move, overwrite, or delete a release tag speculatively.
 
 ## Release procedure
@@ -96,24 +98,48 @@ canonical tag `vX.Y.Z`; for example, `create release 0.0.1` creates `v0.0.1`.
 7. Review the complete diff. A routine version-only release should contain only the five
    version files listed above. Include other release changes only when the user explicitly
    requested them or they are already the intended, reviewed release contents.
-8. Commit the release as `Release X.Y.Z`.
-9. Create an annotated tag on that commit:
+8. Commit the release as `Release X.Y.Z` and push it to the default branch.
+9. Start a candidate build from the default branch:
 
    ```sh
-   git tag -a vX.Y.Z -m "ToeRings vX.Y.Z"
+   gh workflow run publish.yml --ref main
    ```
 
-10. Push the release commit first, then push the exact tag to `origin`. The tag push starts
-    `.github/workflows/publish.yml`, which creates a draft GitHub release, attaches Linux,
-    macOS arm64, macOS Universal, Windows x64 NSIS, and Windows x64 portable bundles, and
-    publishes the release only after all build jobs succeed. After publication, independent
-    jobs request the Homebrew cask update and submit the versioned NSIS installer to WinGet.
-    WinGet publishing requires the `WINGET_TOKEN` repository secret and an existing package
-    version in the official WinGet community repository.
-11. Monitor the publish workflow to completion and report the commit, tag, workflow URL,
-    release URL, artifact status, and Homebrew cask pull request status. After the GitHub
-    release is published, `.github/workflows/publish.yml` dispatches an `update-cask` event
-    to [`ChrisLauinger77/homebrew-cask`](https://github.com/ChrisLauinger77/homebrew-cask).
+   The candidate run validates the version sources, runs the frontend and Rust checks,
+   builds and validates the Linux DEB, RPM, and AppImage, macOS arm64 and Universal app
+   archives, and the Windows x64 NSIS installer and portable ZIP, then uploads them with a
+   `SHA256SUMS` file as the `release-assets` artifact for 30 days. It never creates tags,
+   releases, or package-repository updates. Monitor it to completion and report its URL.
+   Its job summary contains the exact tag commands for that commit and run.
+
+10. Stop and ask the user to download and test the `release-assets` artifact. Do not tag
+    before the user approves the candidate. After approval, create the annotated tag on the
+    candidate commit exactly as printed in the summary and push only that tag:
+
+    ```sh
+    git tag -a vX.Y.Z <CANDIDATE_COMMIT> \
+      -m "ToeRings X.Y.Z" \
+      -m "Candidate-Run: <RUN_ID>"
+
+    git push origin vX.Y.Z
+    ```
+
+    Never rerun a candidate run as a substitute for a new one: publication rejects reruns,
+    failed or incomplete runs, runs of another workflow, branch, or commit, and expired
+    artifacts. A rejected or expired candidate requires a new manual workflow run.
+
+11. The tag push starts the publishing stage of `.github/workflows/publish.yml`. It verifies
+    the annotated tag, the `Candidate-Run` workflow run, and every `SHA256SUMS` digest,
+    then uploads those exact files to a draft GitHub release and publishes it. It does not
+    rebuild. After publication, independent jobs request the Scoop and Homebrew updates and
+    submit the versioned NSIS installer to WinGet. WinGet publishing requires the
+    `WINGET_TOKEN` repository secret and an existing package version in the official WinGet
+    community repository.
+12. Monitor the publish workflow to completion and report the commit, tag, candidate run,
+    workflow URL, release URL, artifact status, and Homebrew cask pull request status. After
+    the GitHub release is published, `.github/workflows/publish.yml` dispatches an
+    `update-cask` event to
+    [`ChrisLauinger77/homebrew-cask`](https://github.com/ChrisLauinger77/homebrew-cask).
     The tap automation opens a pull request; the cask is updated only after that pull request
     is merged. Verify that the dispatch succeeds and report the resulting pull request URL
     and status. Do not modify the tap or merge its pull request unless the user explicitly
