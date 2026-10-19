@@ -3,7 +3,7 @@ const { createHash } = require("node:crypto")
 const { readFileSync, readdirSync, statSync, writeFileSync } = require("node:fs")
 const { join } = require("node:path")
 
-const RELEASE_WORKFLOW = ".github/workflows/publish.yml"
+const RELEASE_WORKFLOW = ".github/workflows/release.yml"
 const CANDIDATE_ARTIFACT = "release-assets"
 const CHECKSUMS = "SHA256SUMS"
 

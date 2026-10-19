@@ -73,7 +73,7 @@ function candidateRun(overrides = {}) {
   return {
     id: 42,
     workflow_id: 7,
-    path: ".github/workflows/publish.yml",
+    path: ".github/workflows/release.yml",
     event: "workflow_dispatch",
     status: "completed",
     conclusion: "success",

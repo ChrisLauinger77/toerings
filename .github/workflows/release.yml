@@ -1,4 +1,4 @@
-name: "publish"
+name: "release"
 
 # Stage 1 (workflow_dispatch): build, test and package a release candidate. It
 # never creates releases, tags or package-repository updates.

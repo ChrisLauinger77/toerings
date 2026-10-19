@@ -12,7 +12,7 @@ frontend through a Tauri command.
 - `src-tauri/tauri.conf.json`: Tauri 2 application and bundle configuration.
 - `.github/workflows/ci.yml`: pull-request and manually dispatched builds for Linux,
   macOS, and Windows.
-- `.github/workflows/publish.yml`: two-stage release. A manual run builds and verifies a
+- `.github/workflows/release.yml`: two-stage release. A manual run builds and verifies a
   release candidate; an annotated version tag publishes that candidate's exact artifacts
   and requests downstream package-manager updates.
 
@@ -102,7 +102,7 @@ canonical tag `vX.Y.Z`; for example, `create release 0.0.1` creates `v0.0.1`.
 9. Start a candidate build from the default branch:
 
    ```sh
-   gh workflow run publish.yml --ref main
+   gh workflow run release.yml --ref main
    ```
 
    The candidate run validates the version sources, runs the frontend and Rust checks,
@@ -128,7 +128,7 @@ canonical tag `vX.Y.Z`; for example, `create release 0.0.1` creates `v0.0.1`.
     failed or incomplete runs, runs of another workflow, branch, or commit, and expired
     artifacts. A rejected or expired candidate requires a new manual workflow run.
 
-11. The tag push starts the publishing stage of `.github/workflows/publish.yml`. It verifies
+11. The tag push starts the publishing stage of `.github/workflows/release.yml`. It verifies
     the annotated tag, the `Candidate-Run` workflow run, and every `SHA256SUMS` digest,
     then uploads those exact files to a draft GitHub release and publishes it. It does not
     rebuild. After publication, independent jobs request the Scoop and Homebrew updates and
@@ -137,7 +137,7 @@ canonical tag `vX.Y.Z`; for example, `create release 0.0.1` creates `v0.0.1`.
     community repository.
 12. Monitor the publish workflow to completion and report the commit, tag, candidate run,
     workflow URL, release URL, artifact status, and Homebrew cask pull request status. After
-    the GitHub release is published, `.github/workflows/publish.yml` dispatches an
+    the GitHub release is published, `.github/workflows/release.yml` dispatches an
     `update-cask` event to
     [`ChrisLauinger77/homebrew-cask`](https://github.com/ChrisLauinger77/homebrew-cask).
     The tap automation opens a pull request; the cask is updated only after that pull request
