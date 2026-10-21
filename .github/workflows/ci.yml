@@ -24,19 +24,15 @@ jobs:
           - platform: "ubuntu-24.04"
             rust-targets: x86_64-unknown-linux-gnu
             tauri-args: ""
-            artifact-name: "toerings-linux-x86_64"
           - platform: macos-15
             rust-targets: aarch64-apple-darwin
             tauri-args: "--target aarch64-apple-darwin --bundles app"
-            artifact-name: "toerings-macos-aarch64"
           - platform: macos-15
             rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
             tauri-args: "--target universal-apple-darwin --bundles app"
-            artifact-name: "toerings-macos-universal"
           - platform: "windows-latest"
             rust-targets: "x86_64-pc-windows-msvc"
             tauri-args: "--target x86_64-pc-windows-msvc --bundles nsis"
-            artifact-name: "toerings-windows-x86_64"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -116,7 +112,6 @@ jobs:
           codesign --verify --deep --strict --verbose=4 "$app_path"
       - name: "create portable Windows ZIP"
         if: matrix.platform == 'windows-latest'
-        id: portable
         shell: pwsh
         run: |
           $version = (Get-Content "package.json" | ConvertFrom-Json).version
@@ -134,30 +129,3 @@ jobs:
             $checksumLine,
             [System.Text.UTF8Encoding]::new($false)
           )
-          "path=$archivePath" >> $env:GITHUB_OUTPUT
-          "checksum-path=$checksumPath" >> $env:GITHUB_OUTPUT
-      - name: collect artifact paths
-        id: artifacts
-        env:
-          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
-        run: |
-          node -e '
-            const fs = require("fs")
-            const paths = JSON.parse(process.env.ARTIFACT_PATHS)
-            const output = `paths<<EOF\n${paths.join("\n")}\nEOF\n`
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, output)
-          '
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: ${{ matrix.artifact-name }}
-          path: ${{ steps.artifacts.outputs.paths }}
-          if-no-files-found: error
-      - name: "upload portable Windows ZIP"
-        if: matrix.platform == 'windows-latest'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: "toerings-windows-x86_64-portable"
-          path: |
-            ${{ steps.portable.outputs.path }}
-            ${{ steps.portable.outputs.checksum-path }}
-          if-no-files-found: error
