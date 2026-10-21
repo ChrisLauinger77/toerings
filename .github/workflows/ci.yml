@@ -42,7 +42,7 @@ jobs:
         with:
           node-version: 24
       - name: install Rust stable
-        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: ${{ matrix.rust-targets }}
       - name: install dependencies (ubuntu only)
