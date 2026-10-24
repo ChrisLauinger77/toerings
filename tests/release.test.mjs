@@ -69,58 +69,6 @@ const repo = { owner: "ChrisLauinger77", repo: "toerings" }
 const commit = "a".repeat(40)
 const sha256 = data => createHash("sha256").update(data).digest("hex")
 
-function candidateRun(overrides = {}) {
-  return {
-    id: 42,
-    workflow_id: 7,
-    path: ".github/workflows/release.yml",
-    event: "workflow_dispatch",
-    status: "completed",
-    conclusion: "success",
-    run_attempt: 1,
-    head_sha: commit,
-    head_branch: "main",
-    repository: { full_name: "ChrisLauinger77/toerings" },
-    head_repository: { full_name: "ChrisLauinger77/toerings" },
-    ...overrides
-  }
-}
-
-function candidateArtifact(overrides = {}) {
-  return {
-    id: 99,
-    name: "release-assets",
-    expired: false,
-    size_in_bytes: 1000,
-    workflow_run: { id: 42, head_sha: commit },
-    ...overrides
-  }
-}
-
-function candidateApi({ refType = "tag", message, run = candidateRun(), artifacts } = {}) {
-  return {
-    paginate: (method, params) => method(params),
-    rest: {
-      git: {
-        getRef: () => Promise.resolve({ data: { object: { type: refType, sha: "tag-object" } } }),
-        getTag: () =>
-          Promise.resolve({
-            data: {
-              tag: "v1.2.3",
-              message: message ?? "ToeRings 1.2.3\n\nCandidate-Run: 42\n",
-              object: { type: "commit", sha: commit }
-            }
-          })
-      },
-      actions: {
-        getWorkflow: () => Promise.resolve({ data: { id: 7 } }),
-        getWorkflowRun: () => Promise.resolve({ data: run }),
-        listWorkflowRunArtifacts: () => artifacts ?? [candidateArtifact()]
-      }
-    }
-  }
-}
-
 function withAssets(callback) {
   const dir = mkdtempSync(join(tmpdir(), "toerings-assets-"))
   const cleanup = () => rmSync(dir, { recursive: true, force: true })
@@ -143,97 +91,14 @@ function withAssets(callback) {
   }
 }
 
-test("candidate run ID comes from exactly one Candidate-Run tag line", () => {
-  assert.equal(release.candidateRunId("ToeRings 1.2.3\n\nCandidate-Run: 123456\n"), 123456)
-  for (const message of [
-    "ToeRings 1.2.3",
-    "Candidate-Run: 0",
-    "Candidate-Run: abc",
-    "Candidate-Run: -5",
-    "Candidate-Run: 12 34",
-    "Candidate-Run: 1\nCandidate-Run: 2",
-    undefined
-  ]) {
-    assert.throws(() => release.candidateRunId(message), /Candidate-Run/)
-  }
-})
-
-test("candidate summary contains the exact tag commands", () => {
+test("candidate summary explains the release environment approval", () => {
   const text = release.candidateSummary({ version: "1.2.3", commit, runId: 42, retentionDays: 30 })
   assert.match(text, /^### Candidate ready for verification/)
-  assert.ok(
-    text.includes(
-      `git tag -a v1.2.3 ${commit} \\\n  -m "ToeRings 1.2.3" \\\n  -m "Candidate-Run: 42"`
-    )
-  )
-  assert.ok(text.includes("git push origin v1.2.3"))
+  assert.match(text, /Review deployments/)
+  assert.ok(text.includes(`\`v1.2.3\` on \`${commit}\` with \`Candidate-Run: 42\``))
+  assert.ok(!text.includes("git tag"))
   assert.match(text, /30 days/)
   assert.match(text, /Do not rerun/)
-})
-
-test("candidate resolution accepts only a successful first manual run of this workflow", async () => {
-  assert.deepEqual(await release.resolveCandidate(candidateApi(), repo, "v1.2.3", "main"), {
-    commit,
-    runId: 42,
-    artifactId: 99
-  })
-  const rejected = {
-    "wrong repository": { repository: { full_name: "someone/toerings" } },
-    "wrong head repository": { head_repository: { full_name: "someone/toerings" } },
-    "wrong workflow": { workflow_id: 8 },
-    "wrong workflow path": { path: ".github/workflows/ci.yml" },
-    "wrong event": { event: "push" },
-    "wrong source commit": { head_sha: "b".repeat(40) },
-    "wrong branch": { head_branch: "feature" },
-    "failed run": { conclusion: "failure" },
-    "incomplete run": { status: "in_progress", conclusion: null },
-    rerun: { run_attempt: 2 },
-    "another run ID": { id: 43 }
-  }
-  for (const [reason, overrides] of Object.entries(rejected)) {
-    await assert.rejects(
-      release.resolveCandidate(
-        candidateApi({ run: candidateRun(overrides) }),
-        repo,
-        "v1.2.3",
-        "main"
-      ),
-      /Candidate run/,
-      reason
-    )
-  }
-  await assert.rejects(
-    release.resolveCandidate(candidateApi({ refType: "commit" }), repo, "v1.2.3", "main"),
-    /annotated tag/
-  )
-  await assert.rejects(
-    release.resolveCandidate(candidateApi({ message: "ToeRings 1.2.3" }), repo, "v1.2.3", "main"),
-    /Candidate-Run/
-  )
-})
-
-test("candidate artifact must be the single unexpired release-assets of that run", async () => {
-  const resolve = artifacts =>
-    release.resolveCandidate(candidateApi({ artifacts }), repo, "v1.2.3", "main")
-  await assert.rejects(resolve([]), /exactly one/)
-  await assert.rejects(
-    resolve([candidateArtifact({ name: "packages-linux-x86_64" })]),
-    /exactly one/
-  )
-  await assert.rejects(
-    resolve([candidateArtifact(), candidateArtifact({ id: 100 })]),
-    /exactly one/
-  )
-  await assert.rejects(resolve([candidateArtifact({ expired: true })]), /expired.*new manual/)
-  await assert.rejects(resolve([candidateArtifact({ size_in_bytes: 0 })]), /empty/)
-  await assert.rejects(
-    resolve([candidateArtifact({ workflow_run: { id: 41, head_sha: commit } })]),
-    /another run/
-  )
-  await assert.rejects(
-    resolve([candidateArtifact({ workflow_run: { id: 42, head_sha: "b".repeat(40) } })]),
-    /another run/
-  )
 })
 
 test("aggregation requires the complete asset set and records its checksums", () => {

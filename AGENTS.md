@@ -13,8 +13,9 @@ frontend through a Tauri command.
 - `.github/workflows/ci.yml`: pull-request and manually dispatched builds for Linux,
   macOS, and Windows.
 - `.github/workflows/release.yml`: two-stage release. A manual run builds and verifies a
-  release candidate; an annotated version tag publishes that candidate's exact artifacts
-  and requests downstream package-manager updates.
+  release candidate, then waits for approval of the `release` environment; approval creates
+  the annotated version tag, publishes that run's exact artifacts, and requests downstream
+  package-manager updates.
 
 Keep framework and frontend upgrades separate from Tauri maintenance. Do not mix Svelte,
 Vite, or TypeScript modernization into Tauri migration or release changes.
@@ -53,8 +54,8 @@ Vite, or TypeScript modernization into Tauri migration or release changes.
 - Do not push, tag, publish a release, or open a pull request unless the user requests it.
 - A direct request such as `create release 0.0.1` is explicit authorization for the release
   procedure below up to the candidate: version edits, verification, commit, pushing the
-  commit, and starting the candidate workflow. Create and push the tag only after the user
-  has tested and approved that candidate.
+  commit, and starting the candidate workflow. Only the user approves the `release`
+  environment deployment; never approve, reject, or bypass it yourself.
 - Never create, move, overwrite, or delete a release tag speculatively.
 
 ## Release procedure
@@ -109,34 +110,33 @@ canonical tag `vX.Y.Z`; for example, `create release 0.0.1` creates `v0.0.1`.
    The candidate run validates the version sources, runs the frontend and Rust checks,
    builds and validates the Linux DEB, RPM, and AppImage, macOS arm64 and Universal app
    archives, and the Windows x64 NSIS installer and portable ZIP, then uploads them with a
-   `SHA256SUMS` file as the `release-assets` artifact for 30 days. It never creates tags,
-   releases, or package-repository updates. Monitor it to completion and report its URL.
-   Its job summary contains the exact tag commands for that commit and run.
+   `SHA256SUMS` file as the `release-assets` artifact for 30 days. It then pauses at the
+   `approve-and-tag` job, which requires approval of the `release` environment. Monitor it
+   until it is waiting for approval and report its URL.
 
-10. Stop and ask the user to download and test the `release-assets` artifact. Do not tag
-    before the user approves the candidate. After approval, create the annotated tag on the
-    candidate commit exactly as printed in the summary and push only that tag:
+10. Stop and ask the user to download and test the `release-assets` artifact and, when
+    satisfied, approve the `release` environment in the run's **Review deployments** dialog.
+    Approval makes `approve-and-tag` create the annotated tag as `github-actions[bot]`:
 
     ```sh
     git tag -a vX.Y.Z <CANDIDATE_COMMIT> \
       -m "ToeRings X.Y.Z" \
       -m "Candidate-Run: <RUN_ID>"
-
-    git push origin vX.Y.Z
     ```
 
-    Never rerun a candidate run as a substitute for a new one: publication rejects reruns,
-    failed or incomplete runs, runs of another workflow, branch, or commit, and expired
-    artifacts. A rejected or expired candidate requires a new manual workflow run.
+    It pushes only that tag and fails if the tag already exists locally or on `origin`.
+    Do not create or push release tags manually; a manually pushed tag does not publish
+    anything. Never rerun a candidate run as a substitute for a new one: tagging rejects
+    reruns. A rejected or expired candidate requires a new manual workflow run.
 
-11. The tag push starts the publishing stage of `.github/workflows/release.yml`. It verifies
-    the annotated tag, the `Candidate-Run` workflow run, and every `SHA256SUMS` digest,
-    then uploads those exact files to a draft GitHub release and publishes it. It does not
-    rebuild. After publication, independent jobs request the Scoop and Homebrew updates and
-    submit the versioned NSIS installer to WinGet. WinGet publishing requires the
-    `WINGET_TOKEN` repository secret and an existing package version in the official WinGet
-    community repository.
-12. Monitor the publish workflow to completion and report the commit, tag, candidate run,
+11. After tagging, the same run continues with the publishing stage. It downloads that run's
+    `release-assets` artifact, verifies every `SHA256SUMS` digest, then uploads those exact
+    files to a draft GitHub release and publishes it. It does not rebuild. After
+    publication, independent jobs request the Scoop and Homebrew updates and submit the
+    versioned NSIS installer to WinGet. WinGet publishing requires the `WINGET_TOKEN`
+    repository secret and an existing package version in the official WinGet community
+    repository.
+12. Monitor the run to completion and report the commit, tag, candidate run,
     workflow URL, release URL, artifact status, and Homebrew cask pull request status. After
     the GitHub release is published, `.github/workflows/release.yml` dispatches an
     `update-cask` event to
@@ -144,7 +144,7 @@ canonical tag `vX.Y.Z`; for example, `create release 0.0.1` creates `v0.0.1`.
     The tap automation opens a pull request; the cask is updated only after that pull request
     is merged. Verify that the dispatch succeeds and report the resulting pull request URL
     and status. Do not modify the tap or merge its pull request unless the user explicitly
-    requests it. If publishing fails after the tag is pushed, preserve the tag and draft
+    requests it. If publishing fails after the tag is created, preserve the tag and draft
     release, diagnose the failure, and do not delete or retarget the tag without explicit
     user confirmation.
 

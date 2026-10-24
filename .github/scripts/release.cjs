@@ -3,7 +3,6 @@ const { createHash } = require("node:crypto")
 const { readFileSync, readdirSync, statSync, writeFileSync } = require("node:fs")
 const { join } = require("node:path")
 
-const RELEASE_WORKFLOW = ".github/workflows/release.yml"
 const CANDIDATE_ARTIFACT = "release-assets"
 const CHECKSUMS = "SHA256SUMS"
 
@@ -163,89 +162,6 @@ function verifyChecksums(dir, version) {
   }))
 }
 
-function candidateRunId(message) {
-  const lines = (message ?? "").split("\n").filter(line => line.startsWith("Candidate-Run:"))
-  if (lines.length !== 1 || !/^Candidate-Run: [1-9]\d{0,15}$/.test(lines[0].trimEnd())) {
-    throw new Error("Release tag must contain exactly one line: Candidate-Run: <workflow run ID>")
-  }
-  return Number(lines[0].slice("Candidate-Run: ".length))
-}
-
-function verifyCandidateRun(run, { repository, workflowId, commit, branch, runId }) {
-  const expected = {
-    id: runId,
-    workflow_id: workflowId,
-    path: RELEASE_WORKFLOW,
-    event: "workflow_dispatch",
-    status: "completed",
-    conclusion: "success",
-    // A rerun can replace artifacts under the same run ID, so only a fresh
-    // first-attempt candidate identifies the bytes the maintainer tested.
-    run_attempt: 1,
-    head_sha: commit,
-    head_branch: branch
-  }
-  for (const [key, value] of Object.entries(expected)) {
-    if (run[key] !== value) {
-      throw new Error(
-        `Candidate run requires ${key}=${JSON.stringify(value)}; found ${JSON.stringify(run[key])}`
-      )
-    }
-  }
-  if (run.repository?.full_name !== repository || run.head_repository?.full_name !== repository) {
-    throw new Error("Candidate run must originate in this repository")
-  }
-}
-
-function selectCandidateArtifact(artifacts, runId, commit) {
-  const matches = artifacts.filter(artifact => artifact.name === CANDIDATE_ARTIFACT)
-  if (matches.length !== 1) {
-    throw new Error(`Candidate run must contain exactly one ${CANDIDATE_ARTIFACT} artifact`)
-  }
-  const [artifact] = matches
-  if (artifact.expired) {
-    throw new Error(
-      `Candidate ${CANDIDATE_ARTIFACT} artifact has expired; start a new manual candidate run`
-    )
-  }
-  if (
-    !(artifact.size_in_bytes > 0) ||
-    artifact.workflow_run?.id !== runId ||
-    artifact.workflow_run?.head_sha !== commit
-  ) {
-    throw new Error(`Candidate ${CANDIDATE_ARTIFACT} artifact is empty or belongs to another run`)
-  }
-  return artifact.id
-}
-
-// Resolves the annotated tag through the API so the message and target do not
-// depend on how the checkout fetched tags.
-async function resolveCandidate(github, repo, tag, branch) {
-  const repository = `${repo.owner}/${repo.repo}`
-  const { data: ref } = await github.rest.git.getRef({ ...repo, ref: `tags/${tag}` })
-  if (ref.object.type !== "tag") {
-    throw new Error("Release requires an annotated tag with a Candidate-Run line")
-  }
-  const { data: tagObject } = await github.rest.git.getTag({ ...repo, tag_sha: ref.object.sha })
-  if (tagObject.tag !== tag || tagObject.object.type !== "commit") {
-    throw new Error("Release tag must be an annotated tag that points directly to a commit")
-  }
-  const commit = tagObject.object.sha
-  const runId = candidateRunId(tagObject.message)
-  const { data: workflow } = await github.rest.actions.getWorkflow({
-    ...repo,
-    workflow_id: RELEASE_WORKFLOW.split("/").at(-1)
-  })
-  const { data: run } = await github.rest.actions.getWorkflowRun({ ...repo, run_id: runId })
-  verifyCandidateRun(run, { repository, workflowId: workflow.id, commit, branch, runId })
-  const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
-    ...repo,
-    run_id: runId,
-    per_page: 100
-  })
-  return { commit, runId, artifactId: selectCandidateArtifact(artifacts, runId, commit) }
-}
-
 function assertUploadedAssets(assets, files) {
   const names = assets.map(asset => asset.name).sort()
   if (JSON.stringify(names) !== JSON.stringify(files.map(file => file.name).sort())) {
@@ -305,25 +221,19 @@ function candidateSummary({ version, commit, runId, retentionDays }) {
     "",
     `Version \`${version}\` from commit \`${commit}\`, candidate run \`${runId}\`.`,
     "",
-    `After this run succeeds, download and test its complete \`${CANDIDATE_ARTIFACT}\` artifact.`,
+    `Download and test the complete \`${CANDIDATE_ARTIFACT}\` artifact of this run.`,
     "",
-    "When satisfied, run these commands in your local checkout:",
-    "",
-    "```bash",
-    `git tag -a ${tag} ${commit} \\`,
-    `  -m "ToeRings ${version}" \\`,
-    `  -m "Candidate-Run: ${runId}"`,
-    "",
-    `git push origin ${tag}`,
-    "```",
-    "",
-    "The tag push publishes the bytes of this candidate without rebuilding them.",
+    "When satisfied, open this run and choose **Review deployments**, select the " +
+      "`release` environment, and approve it. Approval creates the annotated tag " +
+      `\`${tag}\` on \`${commit}\` with \`Candidate-Run: ${runId}\` and publishes the bytes ` +
+      "of this candidate without rebuilding them.",
     "",
     `- The \`${CANDIDATE_ARTIFACT}\` artifact is retained for ${retentionDays} days ` +
-      "(subject to repository limits). Publish before it expires.",
-    "- A new candidate requires a new manual run of this workflow. Do not rerun this run as a " +
-      "substitute; reruns are rejected at publication.",
-    "- Test and approve the artifacts before creating the tag.",
+      "(subject to repository limits), and a pending approval expires after 30 days.",
+    "- To discard this candidate, reject the deployment. A new candidate requires a new " +
+      "manual run of this workflow. Do not rerun this run as a substitute; reruns are " +
+      "rejected before tagging.",
+    "- Test the artifacts before approving.",
     ""
   ].join("\n")
 }
@@ -337,10 +247,6 @@ module.exports = {
   releaseAssets,
   writeChecksums,
   verifyChecksums,
-  candidateRunId,
-  verifyCandidateRun,
-  selectCandidateArtifact,
-  resolveCandidate,
   assertUploadedAssets,
   publishRelease,
   candidateSummary
