@@ -53,6 +53,7 @@ jobs:
       - name: install frontend dependencies
         run: npm ci
       - name: validate frontend
+        shell: bash
         run: |
           npm run check
           npm run lint

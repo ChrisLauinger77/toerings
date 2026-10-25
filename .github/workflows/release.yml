@@ -86,6 +86,7 @@ jobs:
       - name: install frontend dependencies
         run: npm ci
       - name: validate frontend
+        shell: bash
         run: |
           npm run check
           npm run lint
@@ -307,7 +308,7 @@ jobs:
       - name: configure git
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - name: require a new release tag
         run: |
           if git rev-parse -q --verify "refs/tags/$TAG" > /dev/null; then
@@ -380,11 +381,15 @@ jobs:
         if: ${{ env.GH_TOKEN == '' }}
         run: |
           echo "PACKAGE_REPOSITORIES_TOKEN is not configured; the daily Scoop and Homebrew updaters will pick up this version."
-      - name: "Dispatch Scoop and Homebrew updates"
+      - name: "Dispatch Scoop update"
         if: ${{ env.GH_TOKEN != '' }}
         shell: bash
         run: |
           gh api --method POST repos/ChrisLauinger77/scoop-bucket/dispatches -f event_type=update-scoop
+      - name: "Dispatch Homebrew update"
+        if: ${{ !cancelled() && env.GH_TOKEN != '' }}
+        shell: bash
+        run: |
           gh api --method POST repos/ChrisLauinger77/homebrew-cask/dispatches -f event_type=update-cask -F 'client_payload[cask]=toerings'
 
   publish-winget:
