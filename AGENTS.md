@@ -51,7 +51,8 @@ Vite, or TypeScript modernization into Tauri migration or release changes.
 - Pull requests run `.github/workflows/ci.yml` for Linux x86_64, macOS arm64, macOS
   Universal, and Windows x64 builds. CI does not upload artifacts; distributable files come
   only from `.github/workflows/release.yml`.
-- Do not push, tag, publish a release, or open a pull request unless the user requests it.
+- Do not push, tag, publish a release, or open a pull request on your own initiative. Only do
+  so when the user's prompt explicitly instructs you to.
 - A direct request such as `create release 0.0.1` is explicit authorization for the release
   procedure below up to the candidate: version edits, verification, commit, pushing the
   commit, and starting the candidate workflow. Only the user approves the `release`
