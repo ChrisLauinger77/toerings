@@ -29,7 +29,7 @@
     "@tauri-apps/cli": "2.12.4",
     "@tsconfig/svelte": "^5.0.0",
     "@types/lodash-es": "^4.17.6",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "colord": "^2.9.3",
