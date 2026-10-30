@@ -17,7 +17,7 @@ pub async fn get_cpu_data_list(
         .enumerate()
         .map(|(i, cpu)| CpuData {
             data_type: CpuDataType::Cpu(i),
-            cpu_usage: cpu.cpu_usage() as f64,
+            cpu_usage: cpu.usage() as f64,
         })
         .collect();
 

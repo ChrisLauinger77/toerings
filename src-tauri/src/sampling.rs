@@ -38,18 +38,18 @@ impl Sampler {
     pub fn start() -> std::io::Result<Self> {
         Self::spawn(Duration::from_secs(1), || {
             // Construction and the initial baseline can perform blocking OS calls too.
-            let mut collector = DataCollector::new();
+            let mut collector = DataCollector::new().map_err(std::io::Error::other)?;
             collector.init();
-            move || {
+            Ok(move || {
                 futures::executor::block_on(collector.update_data());
                 collector.data.clone()
-            }
+            })
         })
     }
 
     fn spawn<F, S>(interval: Duration, factory: F) -> std::io::Result<Self>
     where
-        F: Fn() -> S + Send + 'static,
+        F: Fn() -> std::io::Result<S> + Send + 'static,
         S: FnMut() -> Data,
     {
         let started_at = Instant::now();
@@ -70,23 +70,29 @@ impl Sampler {
                         break;
                     }
                     let started = Instant::now();
-                    let result = catch_unwind(AssertUnwindSafe(|| {
-                        sample.get_or_insert_with(&factory)()
+                    let result = catch_unwind(AssertUnwindSafe(|| -> std::io::Result<Data> {
+                        let mut next = match sample.take() {
+                            Some(sample) => sample,
+                            None => factory()?,
+                        };
+                        let data = next();
+                        sample = Some(next);
+                        Ok(data)
                     }));
-                    if result.is_err() {
+                    if !matches!(&result, Ok(Ok(_))) {
                         // Drop collector resources outside the snapshot lock.
                         sample = None;
                     }
                     {
                         let mut state = shared.lock().unwrap_or_else(|e| e.into_inner());
                         match result {
-                            Ok(data) => {
+                            Ok(Ok(data)) => {
                                 state.data = data;
                                 state.sequence += 1;
                                 state.published_at = Some(Instant::now());
                                 state.failed = false;
                             }
-                            Err(_) => {
+                            Ok(Err(_)) | Err(_) => {
                                 // The next tick recreates the collector and its baselines.
                                 state.failed = true;
                             }
@@ -194,11 +200,11 @@ mod tests {
             blocked.lock().unwrap().recv().unwrap();
             let entered = entered.clone();
             let blocked = Arc::clone(&blocked);
-            move || {
+            Ok(move || {
                 entered.send("sample").unwrap();
                 blocked.lock().unwrap().recv().unwrap();
                 Data::default()
-            }
+            })
         }).unwrap();
         assert_eq!(entry.recv_timeout(Duration::from_secs(2)).unwrap(), "init");
         // Advance startup age without sleeping through the UI's stale threshold.
@@ -234,11 +240,11 @@ mod tests {
         let sampler = Sampler::spawn(Duration::from_millis(1), move || {
             let entered = entered.clone();
             let blocked = Arc::clone(&blocked);
-            move || {
+            Ok(move || {
                 entered.send(()).unwrap();
                 blocked.lock().unwrap().recv().unwrap();
                 Data::default()
-            }
+            })
         }).unwrap();
         entry.recv_timeout(Duration::from_secs(2)).unwrap();
         let (finished, completion) = mpsc::channel();
@@ -254,16 +260,51 @@ mod tests {
     }
 
     #[test]
+    fn initialization_error_is_reported_and_retried() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let counter = Arc::clone(&attempts);
+        let (entered, retrying) = mpsc::channel();
+        let (release, blocked) = mpsc::channel();
+        let blocked = Arc::new(Mutex::new(blocked));
+        let sampler = Sampler::spawn(Duration::from_millis(2), move || {
+            if counter.fetch_add(1, Ordering::SeqCst) == 0 {
+                return Err(std::io::Error::other("simulated initialization failure"));
+            }
+            entered.send(()).unwrap();
+            blocked.lock().unwrap().recv().unwrap();
+            Ok(|| Data { hostname: Some("ready".into()), ..Data::default() })
+        }).unwrap();
+        retrying.recv_timeout(Duration::from_secs(2)).unwrap();
+        let failed = sampler.snapshot();
+        // Release the retry before asserting, so a regression cannot block the worker.
+        release.send(()).unwrap();
+        assert!(failed.failed);
+        assert_eq!(failed.sequence, 0);
+        assert!(failed.data.hostname.is_none());
+
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while sampler.snapshot().sequence == 0 && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(2));
+        }
+        let recovered = sampler.snapshot();
+        assert!(recovered.sequence > 0);
+        assert!(!recovered.failed);
+        assert_eq!(recovered.data.hostname.as_deref(), Some("ready"));
+        assert_eq!(attempts.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
     fn panic_recreates_collector_and_publishes_again() {
         use std::sync::atomic::{AtomicUsize, Ordering};
         let attempts = Arc::new(AtomicUsize::new(0));
         let counter = Arc::clone(&attempts);
         let sampler = Sampler::spawn(Duration::from_millis(2), move || {
             let attempt = counter.fetch_add(1, Ordering::SeqCst);
-            move || {
+            Ok(move || {
                 assert_ne!(attempt, 0, "simulated collector failure");
                 Data::default()
-            }
+            })
         }).unwrap();
         let deadline = Instant::now() + Duration::from_secs(2);
         while sampler.snapshot().sequence == 0 && Instant::now() < deadline {

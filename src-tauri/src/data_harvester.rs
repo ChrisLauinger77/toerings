@@ -137,18 +137,18 @@ pub struct DataCollector {
 }
 
 impl DataCollector {
-    pub fn new() -> Self {
-        DataCollector {
+    pub fn new() -> Result<Self, sysinfo::Error> {
+        Ok(DataCollector {
             data: Data::default(),
             #[cfg(not(target_os = "linux"))]
             sys: System::new_with_specifics(
                 sysinfo::RefreshKind::nothing()
                     .with_cpu(sysinfo::CpuRefreshKind::everything()),
-            ),
+            )?,
             #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-            components: Components::new_with_refreshed_list(),
+            components: Components::new_with_refreshed_list()?,
             #[cfg(any(target_os = "windows", target_os = "freebsd"))]
-            networks: Networks::new_with_refreshed_list(),
+            networks: Networks::new_with_refreshed_list()?,
             previous_cpu_times: vec![],
             previous_average_cpu_time: None,
             #[cfg(target_os = "linux")]
@@ -166,7 +166,7 @@ impl DataCollector {
             battery_manager: None,
             #[cfg(feature = "battery")]
             battery_list: None,
-        }
+        })
     }
 
     pub fn init(&mut self) {
@@ -380,11 +380,11 @@ impl DataCollector {
             self.data.disks = disks;
         }
 
-        self.data.uptime = Duration::from_secs(System::uptime());
-        self.data.hostname = System::host_name();
-        self.data.kernel_name = System::name();
-        self.data.kernel_version = System::kernel_version();
-        self.data.os_version = System::long_os_version();
+        self.data.uptime = System::uptime().map(Duration::from_secs).unwrap_or_default();
+        self.data.hostname = System::host_name().ok();
+        self.data.kernel_name = System::name().ok();
+        self.data.kernel_version = System::kernel_version().ok();
+        self.data.os_version = System::long_os_version().ok();
         self.data.local_ip = local_ip_address::local_ip().ok();
 
         // Update time
