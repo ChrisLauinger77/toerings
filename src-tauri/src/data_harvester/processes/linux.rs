@@ -156,7 +156,7 @@ fn read_proc(
 
     let process_state_char = stat.state;
     let process_state = (
-        ProcessStatus::from(process_state_char).to_string(),
+        ProcessStatus::from(process_state_char as u8).to_string(),
         process_state_char,
     );
     let (cpu_usage_percent, new_process_times) = get_linux_cpu_usage(
@@ -362,7 +362,7 @@ mod tests {
         assert_eq!(
             (sample.read_bytes_per_sec, sample.write_bytes_per_sec), (2000, 4000),
         );
-        assert_eq!(sample.process_state.1, 'R');
+        assert_eq!(sample.process_state, ("Runnable".into(), 'R'));
         assert_eq!(baseline.io, Some((5000, 10000, now)));
         assert_eq!(baseline.cpu_time, 150);
         assert_eq!(baseline.start_time, Some(100));

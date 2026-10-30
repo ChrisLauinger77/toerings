@@ -8,7 +8,7 @@ pub async fn get_network_data(
     curr_time: Instant,
 ) -> crate::utils::error::Result<Option<NetworkHarvest>> {
     let counters = networks.iter().map(|(name, network)| (
-        name.to_string(), network.total_received(), network.total_transmitted()
+        name.to_string_lossy().into_owned(), network.total_received(), network.total_transmitted()
     ));
     Ok(Some(history.sample(counters, curr_time)))
 }
