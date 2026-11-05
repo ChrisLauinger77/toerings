@@ -13,7 +13,7 @@ on:
       - "renovate.json"
   workflow_dispatch:
   schedule:
-    - cron: "0 0 1 * *"
+    - cron: "1 1 1 * *"
 
 jobs:
   build-tauri:
