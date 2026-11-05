@@ -86,19 +86,22 @@ You can also download the NSIS installer or portable ZIP from the GitHub release
 
 ## Install from Source
 
-You can build the executable locally. This requires Node.js 24 or newer and Rust 1.95 or
-newer.
+You can build the executable locally. This requires Node.js 24 or newer, Rust 1.95 or
+newer, and the [Tauri 2 system prerequisites](https://v2.tauri.app/start/prerequisites/)
+for your platform. Linux builds use WebKitGTK 4.1.
 
 ```sh
 git clone https://github.com/ChrisLauinger77/toerings.git
 cd toerings
-npm i
+npm ci
 npm run tauri build
 ```
 
 ## Configure
 
-There is a preferences panel which is accessible from the app menu.
+The preferences panel sets the theme, interface and ring colors, font, and language. Open it
+with the button next to the **System** title, with `Ctrl+,` (`Cmd+,` on macOS), or from the
+app menu on Linux and macOS.
 
 ![preferences panel](./public/example-preferences.png)
 
@@ -108,6 +111,6 @@ service when the app starts and every 10 minutes while the app is running.
 ## Run in Development
 
 ```sh
-npm i
+npm ci
 npm run tauri dev
 ```
