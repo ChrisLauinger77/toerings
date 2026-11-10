@@ -161,11 +161,19 @@ test("a new selection cancels a stale retry timer", async context => {
     calls.map(call => call.locale),
     ["de", "fr"]
   )
-  calls[1].succeed()
+  await advance(100)
+  calls[1].fail()
+  await setImmediate()
+  // The stale 250 ms timer from "de" would fire now; only "fr" owns the backoff.
+  await advance(150)
+  assert.equal(calls.length, 2, "a cancelled timer must not retry early")
+  await advance(100)
+  assert.equal(calls[2].locale, "fr")
+  calls[2].succeed()
   await setImmediate()
   await advance(10000)
   assert.equal(nativeLocale(), "fr")
-  assert.equal(calls.length, 2)
+  assert.equal(calls.length, 3)
 })
 
 test("returning to an applied language reconciles an intervening success or failure", async context => {
