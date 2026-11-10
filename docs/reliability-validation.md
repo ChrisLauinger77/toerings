@@ -35,13 +35,11 @@ The current repository passes the local checks that do not require another opera
 
 - `npm run check`: zero errors and warnings.
 - `npm run lint`: passes.
-- `npm test`: all 31 frontend and release tests pass under an English or C locale (see the locale note below).
+- `npm test`: all 31 frontend and release tests pass.
 - `npm run build`: passes.
 - `cargo test --locked --manifest-path src-tauri/Cargo.toml`: all 34 Rust tests pass on Linux.
 
 The merged reliability and maintenance PRs [#77](https://github.com/ChrisLauinger77/toerings/pull/77) through [#82](https://github.com/ChrisLauinger77/toerings/pull/82) passed the established CI matrix: Ubuntu 22.04 x86_64, macOS arm64, macOS Universal, and Windows x64. Each matrix job performs a clean `npm ci`, the frontend checks/tests/build, locked Rust tests, and a locked Tauri build. Linux additionally repacks and inspects the Debian, RPM, and AppImage bundles and smoke-tests the Debian and AppImage under Xvfb. macOS verifies the strict ad-hoc app signature, and Windows performs a ten-second executable startup smoke test and creates the NSIS and portable bundles.
-
-With a German system locale (`de_DE.UTF-8`), `npm test` reports one failure: the unavailable-telemetry widget test expects the English `N/A` label. Run the suite with `LC_ALL=C.UTF-8` or an English locale to reproduce the CI baseline.
 
 These checks establish compilation, unit/regression behavior, package structure, signatures where configured, and limited startup survival. They do not claim interactive GUI behavior, native menu appearance, compositor-specific behavior, suspend/resume recovery, or long-running telemetry correctness.
 
