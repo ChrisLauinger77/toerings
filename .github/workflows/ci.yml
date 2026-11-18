@@ -8,6 +8,7 @@ on:
       - "AGENTS.md"
       - ".github/FUNDING.yml"
       - ".github/ISSUE_TEMPLATE/**"
+      - ".github/workflows/claude.yml"
       - ".gitignore"
       - "src-tauri/.gitignore"
       - "renovate.json"
