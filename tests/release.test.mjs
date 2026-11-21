@@ -148,7 +148,7 @@ test("publication rejects candidates whose bytes or checksums changed", () => {
     },
     "missing SHA256SUMS": dir => rmSync(join(dir, "SHA256SUMS")),
     "missing package": dir => rmSync(join(dir, "ToeRings-1.2.3-1.x86_64.rpm")),
-    "empty package": dir => writeFileSync(join(dir, "ToeRings_1.2.3_amd64.AppImage"), "")
+    "empty package": dir => writeFileSync(join(dir, "ToeRings_1.2.3_x86_64.AppImage"), "")
   }
   for (const [reason, tamper] of Object.entries(tampered)) {
     withAssets(dir => {

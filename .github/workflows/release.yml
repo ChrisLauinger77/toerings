@@ -142,10 +142,15 @@ jobs:
           ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
         run: |
           mkdir -p "$RUNNER_TEMP/release"
-          jq -r '.[] | select(endswith(".deb") or endswith(".rpm") or endswith(".AppImage"))' \
+          jq -r '.[] | select(endswith(".deb") or endswith(".rpm"))' \
             <<< "$ARTIFACT_PATHS" | while read -r artifact_path; do
               cp "$artifact_path" "$RUNNER_TEMP/release/"
             done
+          # Tauri names the AppImage with the Debian architecture (amd64); publish it
+          # with the architecture name used by AppImages (x86_64).
+          appimage_path=$(jq -r '.[] | select(endswith(".AppImage"))' <<< "$ARTIFACT_PATHS")
+          test -n "$appimage_path"
+          cp "$appimage_path" "$RUNNER_TEMP/release/ToeRings_${VERSION}_x86_64.AppImage"
       - name: verify macOS app signature
         if: startsWith(matrix.platform, 'macos')
         env:
