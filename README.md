@@ -36,8 +36,8 @@ sudo dnf install ./ToeRings-*.x86_64.rpm
 The AppImage runs without installation:
 
 ```sh
-chmod +x ToeRings_*_amd64.AppImage
-./ToeRings_*_amd64.AppImage
+chmod +x ToeRings_*_x86_64.AppImage
+./ToeRings_*_x86_64.AppImage
 ```
 
 ## Install on macOS
