@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-  echo "Usage: $0 <AppImage>" >&2
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+  echo "Usage: $0 <AppImage> [<release AppImage>]" >&2
   exit 2
 fi
 
@@ -13,7 +13,12 @@ if [[ ! -f "$appimage_path" ]]; then
   exit 2
 fi
 
-for command in dd mksquashfs realpath sed; do
+required_commands=(dd mksquashfs realpath sed)
+if [[ $# -eq 2 ]]; then
+  required_commands+=(zsyncmake)
+fi
+
+for command in "${required_commands[@]}"; do
   if ! command -v "$command" >/dev/null; then
     echo "Required command not found: $command" >&2
     exit 2
@@ -26,6 +31,17 @@ trap 'rm -rf "$work_dir"' EXIT
 runtime_path="$work_dir/runtime"
 filesystem_path="$work_dir/filesystem.squashfs"
 output_path="$work_dir/repacked.AppImage"
+if [[ $# -eq 2 ]]; then
+  release_path=$2
+  release_name=${release_path##*/}
+  update_information=${LDAI_UPDATE_INFORMATION:?Set the same update information used by linuxdeploy}
+  zsync_pattern=${update_information##*|}
+  if [[ "$release_name.zsync" != $zsync_pattern ]]; then
+    echo "Release zsync filename does not match the update pattern: $release_name.zsync" >&2
+    exit 2
+  fi
+  output_path="$work_dir/$release_name"
+fi
 
 runtime_size=$("$appimage_path" --appimage-offset)
 dd if="$appimage_path" of="$runtime_path" bs=1 count="$runtime_size" status=none
@@ -113,4 +129,24 @@ mksquashfs "$work_dir/squashfs-root" "$filesystem_path" \
 cp "$runtime_path" "$output_path"
 dd if="$filesystem_path" of="$output_path" bs=1M oflag=append conv=notrunc status=none
 chmod +x "$output_path"
-mv "$output_path" "$appimage_path"
+
+if [[ $# -eq 2 ]]; then
+  # The original runtime carries the embedded update information through the repack.
+  embedded_update_information=$("$output_path" --appimage-updateinformation)
+  if [[ "$embedded_update_information" != "$update_information" ]]; then
+    echo "Repacked AppImage is missing the expected update information: $update_information" >&2
+    exit 2
+  fi
+
+  # Generate the control file from the final bytes and use the published name as its URL.
+  (
+    cd "$work_dir"
+    zsyncmake -u "$release_name" "$release_name"
+  )
+  test -s "$output_path.zsync"
+  mkdir -p "$(dirname -- "$release_path")"
+  mv "$output_path" "$release_path"
+  mv "$output_path.zsync" "$release_path.zsync"
+else
+  mv "$output_path" "$appimage_path"
+fi

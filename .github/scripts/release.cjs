@@ -81,6 +81,7 @@ function releaseAssets(version) {
     `ToeRings_${version}_amd64.deb`,
     `ToeRings-${version}-1.x86_64.rpm`,
     `ToeRings_${version}_x86_64.AppImage`,
+    `ToeRings_${version}_x86_64.AppImage.zsync`,
     `ToeRings_${version}_aarch64.app.zip`,
     `ToeRings_${version}_universal.app.zip`,
     `ToeRings_${version}_x64-setup.exe`,

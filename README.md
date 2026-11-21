@@ -40,6 +40,10 @@ chmod +x ToeRings_*_x86_64.AppImage
 ./ToeRings_*_x86_64.AppImage
 ```
 
+Releases with an `.AppImage.zsync` companion support differential updates through
+[AppImageUpdate](https://github.com/AppImageCommunity/AppImageUpdate). If you have an
+older AppImage without embedded update information, download the latest AppImage manually once.
+
 ## Install on macOS
 
 Install ToeRings with [Homebrew](https://brew.sh/):

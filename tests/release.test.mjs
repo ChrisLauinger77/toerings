@@ -110,6 +110,7 @@ test("aggregation requires the complete asset set and records its checksums", ()
       [...release.releaseAssets("1.2.3"), "SHA256SUMS"]
     )
     for (const file of files) assert.equal(file.sha256, sha256(readFileSync(file.path)))
+    assert.ok(files.some(file => file.name === "ToeRings_1.2.3_x86_64.AppImage.zsync"))
     assert.throws(() => release.verifyChecksums(dir, "1.2.4"), /missing/)
   })
   for (const name of release.releaseAssets("1.2.3")) {
@@ -131,6 +132,8 @@ test("aggregation requires the complete asset set and records its checksums", ()
 test("publication rejects candidates whose bytes or checksums changed", () => {
   const tampered = {
     "modified asset": dir => writeFileSync(join(dir, "ToeRings_1.2.3_amd64.deb"), "changed"),
+    "modified zsync file": dir =>
+      writeFileSync(join(dir, "ToeRings_1.2.3_x86_64.AppImage.zsync"), "changed"),
     "modified checksum": dir => {
       const sums = readFileSync(join(dir, "SHA256SUMS"), "utf8")
       writeFileSync(
