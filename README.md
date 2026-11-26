@@ -17,9 +17,19 @@ The name "ToeRings" just sounds like Tauri, and contains the word "rings".
 
 ## Install on Linux
 
-Download the package for your distribution from the GitHub release assets.
 Starting with ToeRings 0.7.0, prebuilt Linux packages require Ubuntu 24.04 or another
 distribution with glibc 2.39 or newer. Ubuntu 22.04 users should stay on ToeRings 0.6.1.
+
+On supported x86-64 Debian and Ubuntu systems, you can install ToeRings with
+[deb-get](https://github.com/wimpysworld/deb-get#install). After setting up deb-get,
+refresh its package index, then install ToeRings.
+
+```sh
+deb-get update
+deb-get install toe-rings
+```
+
+To install manually, download the package for your distribution from the GitHub release assets.
 
 Debian and Ubuntu:
 
